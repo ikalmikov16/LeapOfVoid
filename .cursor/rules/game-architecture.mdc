@@ -64,9 +64,11 @@ glow / trail color via `HEAT_COLORS`), the HUD ×N badge, and the SFX pitch —
 one variable, four consumers.
 
 On capture: orbit direction follows approach direction; the orbit starts exactly
-at the capture point and settles out to the planet's fixed ring over
-`CAPTURE_SETTLE_S`, blending angular speed from the (capped) flight speed down to
-the orbit speed — position and velocity stay continuous, no snap. Release
+at the capture point — position and velocity stay continuous, no snap. The latch
+runs on two clocks: angular speed calms from the (capped) flight whip to orbit
+speed over the short `CAPTURE_OMEGA_SETTLE_S` (aim must be controllable again
+fast), while the radius glides out to the ring over the longer
+`CAPTURE_SETTLE_S` (pure looks — radius never affects the aim tangent). Release
 velocity is the orbit tangent.
 
 Camera: climbing is snappy; while orbiting it may also ease back down to the

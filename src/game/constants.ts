@@ -46,14 +46,21 @@ export const PERFECT_BAND_FRACTION = 0.15;
 
 // --- Capture latch-on (smooth settle instead of snapping to the ring) ---
 
-/** Seconds to ease from the capture point/speed onto the ring orbit. */
-export const CAPTURE_SETTLE_S = 0.6;
+/** Seconds for the orbit radius to glide from the capture point to the ring. */
+export const CAPTURE_SETTLE_S = 0.8;
+/**
+ * Seconds for the angular speed to calm from the capture whip down to orbit
+ * speed. Deliberately much shorter than the radius glide: the tangent (the
+ * player's aim) must be controllable again almost immediately, or quick
+ * releases after a latch are pure luck — while the visual glide stays slow.
+ */
+export const CAPTURE_OMEGA_SETTLE_S = 0.25;
 /**
  * Cap on the initial angular speed (rad/s) right after capture. Velocity
  * continuity wants FLIGHT_SPEED / captureRadius, but a deep graze on a small
- * planet would whip at 20+ rad/s — cap it to a fast-but-readable spin.
+ * planet would whip at 20+ rad/s — cap it to a brief, readable catch.
  */
-export const CAPTURE_OMEGA_MAX = 7;
+export const CAPTURE_OMEGA_MAX = 5;
 
 // --- Camera ---
 

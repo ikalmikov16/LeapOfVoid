@@ -17,6 +17,7 @@ import {
   CAMERA_PLANET_ANCHOR,
   CAMERA_SMOOTHING,
   CAPTURE_OMEGA_MAX,
+  CAPTURE_OMEGA_SETTLE_S,
   CAPTURE_POINTS,
   CAPTURE_SETTLE_S,
   FLIGHT_SPEED,
@@ -139,19 +140,25 @@ function stepOrbit(state: GameState, dt: number): void {
   if (planet === null) return;
 
   const baseSpeed = orbitAngularSpeed(state.planetsPassed);
+
+  // Latch-on runs on two clocks. The whip (angular speed easing from the
+  // capped flight speed, which is exactly tangential at the closest-approach
+  // point, down to orbit speed) calms fast so the aim tangent is
+  // controllable again almost immediately. The radius glide out to the ring
+  // is much slower — pure looks, since radius never affects the tangent
+  // direction. Both finish inside the grace window, so neither fights decay.
   let angularSpeed = baseSpeed;
-  const settleT = Math.min(1, (state.time - state.lastCaptureAt) / CAPTURE_SETTLE_S);
-  if (settleT < 1) {
-    // Latch-on settle: ease the radius from the capture distance out to the
-    // ring, and the angular speed from the flight speed (which is exactly
-    // tangential at the closest-approach point) down to the orbit speed.
-    // Position AND velocity stay continuous — no snap. Smoothstep so both
-    // ends of the blend are gentle. Settle always finishes inside the
-    // capture grace window, so it never fights orbit decay.
-    const k = settleT * settleT * (3 - 2 * settleT);
-    state.orbitRadius = state.captureRadius + (planet.ringRadius - state.captureRadius) * k;
+  const omegaT = Math.min(1, (state.time - state.lastCaptureAt) / CAPTURE_OMEGA_SETTLE_S);
+  if (omegaT < 1) {
+    const k = omegaT * omegaT * (3 - 2 * omegaT);
     const captureSpeed = Math.min(FLIGHT_SPEED / Math.max(state.captureRadius, 1), CAPTURE_OMEGA_MAX);
     angularSpeed = captureSpeed + (baseSpeed - captureSpeed) * k;
+  }
+
+  const settleT = Math.min(1, (state.time - state.lastCaptureAt) / CAPTURE_SETTLE_S);
+  if (settleT < 1) {
+    const k = settleT * settleT * (3 - 2 * settleT);
+    state.orbitRadius = state.captureRadius + (planet.ringRadius - state.captureRadius) * k;
   } else if (state.time < state.graceUntil) {
     // Settle done (its last frame lands a hair short of the ring); hold the
     // exact ring until decay takes over after grace.
