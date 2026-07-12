@@ -37,6 +37,8 @@ src/
   rendering/  Skia drawing of game state
   screens/    React screens (Game, Home, Death overlay)
   state/      zustand stores (screen, settings, best score) — never per-frame data
+plans/        per-milestone implementation plans (write BEFORE implementing;
+              see the planning rule)
 ```
 
 ## Hard constraints

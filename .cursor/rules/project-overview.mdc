@@ -33,7 +33,7 @@ but no ad SDK in v1.
 
 Track milestone progress here as milestones complete:
 
-- [ ] M1: Core loop prototype (static planet chain, orbit, tap-release, capture/crash/miss, death, restart, score)
+- [x] M1: Core loop prototype (static planet chain, orbit, tap-release, capture/crash/miss, death, restart, score) — feel validated on device
 - [ ] M2: Procedural generation, camera follow, difficulty dials, orbit decay
 - [ ] M3: Juice pass (trail, particles, shake, haptics, SFX, combo/graze/perfect, zones)
 - [ ] M4: Meta screens (home, death card, settings, best-score persistence)

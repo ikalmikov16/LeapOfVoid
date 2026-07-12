@@ -1,0 +1,31 @@
+---
+description: Plan-first workflow — write a plan doc before implementing
+alwaysApply: true
+---
+
+# Plan Before Implementing
+
+Before implementing any milestone or non-trivial feature, write a plan to
+`plans/<topic>.md` and get the user's sign-off. Only start coding after the
+plan is agreed.
+
+Every plan should contain:
+
+1. **Goal** — what exists when this is done, in one paragraph.
+2. **Scope** — explicit in/out lists; "out" prevents scope creep (check the
+   v2 parking lot in `orbit-game-plan.md`).
+3. **Design decisions** — the choices that shape the code, with reasoning,
+   so implementation doesn't re-litigate them.
+4. **Implementation steps** — ordered so the game stays playable after each
+   step; note which files/modules each step touches.
+5. **Testing & acceptance criteria** — what proves it works (unit tests for
+   pure logic, on-device checks for feel).
+
+Conventions:
+
+- One plan per milestone/feature; name files `m2-…`, `m3-…` or by topic.
+- If decisions change mid-implementation, update the plan in place — plans
+  are living documents, and stale plans are worse than none.
+- Mark the plan's status at the top: Draft → Approved → In progress → Done.
+- `orbit-game-plan.md` (repo root) stays the master design doc; plans in
+  `plans/` are per-milestone implementation plans derived from it.
