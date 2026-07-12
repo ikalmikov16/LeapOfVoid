@@ -34,9 +34,12 @@ Install native deps with `bunx expo install`, not bare `bun add`.
 ```
 src/
   game/       pure TS simulation — no React/Skia/Reanimated imports
-  rendering/  Skia drawing of game state
+  rendering/  Skia drawing of game state (canvas, particle effects, zone palettes)
   screens/    React screens (Game, Home, Death overlay)
+  audio/      SFX playback (expo-audio players)
+  effects/    haptics
   state/      zustand stores (screen, settings, best score) — never per-frame data
+assets/sfx/   generated WAVs — regenerate with `bun run sfx` (scripts/generate-sfx.ts)
 plans/        per-milestone implementation plans (write BEFORE implementing;
               see the planning rule)
 ```

@@ -15,18 +15,31 @@ import {
   CAMERA_BALL_ANCHOR,
   CAMERA_PLANET_ANCHOR,
   CAMERA_SMOOTHING,
+  CAPTURE_POINTS,
+  COMBO_MULTIPLIER_CAP,
+  COMBO_WINDOW_REVOLUTIONS,
   FLIGHT_SPEED,
   GRACE_AFTER_CAPTURE_S,
+  GRAZE_MARGIN,
+  GRAZE_POINTS,
   OFFSCREEN_MARGIN,
   OFFSCREEN_TOP_SCREENS,
+  PERFECT_BAND_FRACTION,
+  PERFECT_POINTS,
   PLANET_COLORS,
   RESTART_COOLDOWN_S,
 } from './constants';
-import { captureBandWidth, orbitAngularSpeed, orbitDecayRate, planetRadius } from './difficulty';
+import {
+  captureBandWidth,
+  orbitAngularSpeed,
+  orbitDecayRate,
+  planetRadius,
+  zoneIndex as zoneIndexOf,
+} from './difficulty';
 import { updatePlanetWindow } from './generation';
 import { closestApproachOnSegment, pointOnCircle, segmentCircleEntry } from './geometry';
 import { rand01 } from './rng';
-import type { DeathCause, GameState, Planet, Vec2 } from './types';
+import type { CaptureKind, DeathCause, GameState, Planet, Vec2 } from './types';
 
 export function findPlanet(planets: Planet[], id: number): Planet | null {
   'worklet';
@@ -34,6 +47,12 @@ export function findPlanet(planets: Planet[], id: number): Planet | null {
     if (planets[i].id === id) return planets[i];
   }
   return null;
+}
+
+/** Current combo multiplier: consecutive quick releases, floored at ×1. */
+export function comboMultiplier(comboLinks: number): number {
+  'worklet';
+  return Math.min(Math.max(comboLinks, 1), COMBO_MULTIPLIER_CAP);
 }
 
 export function createInitialState(width: number, height: number, seed?: number): GameState {
@@ -52,10 +71,20 @@ export function createInitialState(width: number, height: number, seed?: number)
     graceUntil: 0,
     ballPos: { x: 0, y: 0 },
     velocity: { x: 0, y: 0 },
+    planetsPassed: 0,
     score: 0,
+    comboLinks: 0,
+    revolutions: 0,
+    zoneIndex: 0,
     time: 0,
     deathTime: 0,
     deathCause: null,
+    lastReleaseAt: -99,
+    lastCaptureAt: -99,
+    captureKind: 0,
+    capturePos: { x: 0, y: 0 },
+    zoneChangedAt: -99,
+    effectSeed: 1,
     rngState: seed !== undefined ? seed | 0 : Math.floor(Math.random() * 4294967296) | 0,
     nextPlanetId: 1,
   };
@@ -78,12 +107,18 @@ export function createInitialState(width: number, height: number, seed?: number)
 
 function release(state: GameState): void {
   'worklet';
+  // Quick release keeps the streak alive; stepOrbit already killed it the
+  // moment the combo window closed, so only the increment lives here.
+  if (state.revolutions < COMBO_WINDOW_REVOLUTIONS) {
+    state.comboLinks += 1;
+  }
   // Velocity is the orbit tangent: d/dt of (cos a, sin a) scaled by direction.
   state.velocity = {
     x: -Math.sin(state.angle) * state.direction * FLIGHT_SPEED,
     y: Math.cos(state.angle) * state.direction * FLIGHT_SPEED,
   };
   state.departedPlanetId = state.currentPlanetId;
+  state.lastReleaseAt = state.time;
   state.phase = 'flying';
 }
 
@@ -92,6 +127,7 @@ function die(state: GameState, cause: DeathCause): void {
   state.phase = 'dead';
   state.deathCause = cause;
   state.deathTime = state.time;
+  state.comboLinks = 0;
 }
 
 function stepOrbit(state: GameState, dt: number): void {
@@ -101,7 +137,7 @@ function stepOrbit(state: GameState, dt: number): void {
   // Decay: the orbit spirals inward once past the grace window; reaching the
   // surface is the anti-camping death.
   if (state.time >= state.graceUntil) {
-    const rate = orbitDecayRate(state.score);
+    const rate = orbitDecayRate(state.planetsPassed);
     if (rate > 0) {
       state.orbitRadius -= rate * dt;
       if (state.orbitRadius <= planet.radius + BALL_RADIUS) {
@@ -111,11 +147,19 @@ function stepOrbit(state: GameState, dt: number): void {
       }
     }
   }
-  state.angle += state.direction * orbitAngularSpeed(state.score) * dt;
+  const angularSpeed = orbitAngularSpeed(state.planetsPassed);
+  state.angle += state.direction * angularSpeed * dt;
+  // Track revolutions; the streak dies the instant the combo window closes
+  // (not at release), so the trail visibly cools while you hesitate.
+  state.revolutions += (angularSpeed * dt) / (Math.PI * 2);
+  if (state.revolutions >= COMBO_WINDOW_REVOLUTIONS && state.comboLinks > 0) {
+    state.comboLinks = 0;
+  }
   state.ballPos = pointOnCircle(planet.center, state.orbitRadius, state.angle);
 }
 
-function capture(state: GameState, planet: Planet, point: Vec2): void {
+/** approachDistance = the flight path's closest approach to the planet center. */
+function capture(state: GameState, planet: Planet, point: Vec2, approachDistance: number): void {
   'worklet';
   const radial = { x: point.x - planet.center.x, y: point.y - planet.center.y };
   // Orbit direction follows the approach direction so the flow feels continuous.
@@ -129,14 +173,39 @@ function capture(state: GameState, planet: Planet, point: Vec2): void {
   state.graceUntil = state.time + GRACE_AFTER_CAPTURE_S;
   state.ballPos = pointOnCircle(planet.center, planet.ringRadius, state.angle);
   state.phase = 'orbiting';
-  state.score += 1;
+  state.revolutions = 0;
+
+  // Scoring: perfect (band center) beats graze (skimmed the surface).
+  const band = planet.ringRadius - planet.radius;
+  const bandCenter = planet.radius + band / 2;
+  let kind: CaptureKind = 0;
+  if (Math.abs(approachDistance - bandCenter) <= (band * PERFECT_BAND_FRACTION) / 2) {
+    kind = 2;
+  } else if (approachDistance - planet.radius <= GRAZE_MARGIN) {
+    kind = 1;
+  }
+  state.planetsPassed += 1;
+  state.score +=
+    CAPTURE_POINTS * comboMultiplier(state.comboLinks) +
+    (kind === 2 ? PERFECT_POINTS : kind === 1 ? GRAZE_POINTS : 0);
+
+  // Effect stamps (hash instead of consuming rngState — generation stays
+  // deterministic regardless of how captures interleave).
+  state.lastCaptureAt = state.time;
+  state.captureKind = kind;
+  state.capturePos = { x: state.ballPos.x, y: state.ballPos.y };
+  state.effectSeed = (state.rngState ^ Math.imul(state.planetsPassed, 2654435761)) >>> 0;
+
+  const zone = zoneIndexOf(state.planetsPassed);
+  if (zone !== state.zoneIndex) {
+    state.zoneIndex = zone;
+    state.zoneChangedAt = state.time;
+  }
 }
 
-interface CaptureEvent {
-  t: number;
-  planet: Planet;
-  point: Vec2;
-}
+type FlightEvent =
+  | { kind: 'crash'; t: number }
+  | { kind: 'capture'; t: number; planet: Planet; point: Vec2; distance: number };
 
 function stepFlight(state: GameState, dt: number): void {
   'worklet';
@@ -146,27 +215,20 @@ function stepFlight(state: GameState, dt: number): void {
     y: from.y + state.velocity.y * dt,
   };
 
-  // Earliest capture along this frame's segment wins.
-  let event: CaptureEvent | null = null;
+  // Earliest event along this frame's segment wins.
+  let event: FlightEvent | null = null;
   for (let i = 0; i < state.planets.length; i++) {
     const planet = state.planets[i];
     if (planet.id === state.departedPlanetId) continue;
 
-    // Direct body hit still captures: the ball rides up onto the ring from
-    // the surface impact point (no crash deaths — only lost and burned).
+    // Closest approach inside the body = crash (checked as circle entry so
+    // the ball dies at the surface, not past it).
     const entryT = segmentCircleEntry(from, to, planet.center, planet.radius);
     if (entryT !== null && (event === null || entryT < event.t)) {
-      event = {
-        t: entryT,
-        planet,
-        point: {
-          x: from.x + (to.x - from.x) * entryT,
-          y: from.y + (to.y - from.y) * entryT,
-        },
-      };
+      event = { kind: 'crash', t: entryT };
     }
 
-    // Graze capture: the path's closest approach falls inside the capture band.
+    // Capture: the path's closest approach falls inside the capture band.
     // approach.t < 1 means the minimum is passed within this frame's segment;
     // while still approaching (t clamps to 1) we wait for a later frame.
     const approach = closestApproachOnSegment(from, to, planet.center);
@@ -176,7 +238,13 @@ function stepFlight(state: GameState, dt: number): void {
       approach.distance <= planet.ringRadius &&
       (event === null || approach.t < event.t)
     ) {
-      event = { t: approach.t, planet, point: approach.point };
+      event = {
+        kind: 'capture',
+        t: approach.t,
+        planet,
+        point: approach.point,
+        distance: approach.distance,
+      };
     }
   }
 
@@ -193,7 +261,16 @@ function stepFlight(state: GameState, dt: number): void {
     return;
   }
 
-  capture(state, event.planet, event.point);
+  if (event.kind === 'crash') {
+    state.ballPos = {
+      x: from.x + (to.x - from.x) * event.t,
+      y: from.y + (to.y - from.y) * event.t,
+    };
+    die(state, 'crash');
+    return;
+  }
+
+  capture(state, event.planet, event.point, event.distance);
 }
 
 function stepCamera(state: GameState, dt: number): void {

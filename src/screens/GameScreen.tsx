@@ -1,18 +1,24 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import {
+import Animated, {
+  FadeIn,
+  FadeOut,
   runOnJS,
   useAnimatedReaction,
   useFrameCallback,
   useSharedValue,
 } from 'react-native-reanimated';
-import { MAX_FRAME_DT_S } from '../game/constants';
-import { createInitialState, handleTap, stepGame } from '../game/engine';
-import type { DeathCause, GameState, Phase, Planet } from '../game/types';
+import { initAudio, sfxCapture, sfxDeath, sfxRelease, sfxZone } from '../audio/sfx';
+import { hapticCapture, hapticDeath, hapticRelease, hapticZone } from '../effects/haptics';
+import { DEATH_OVERLAY_DELAY_MS, MAX_FRAME_DT_S, ZONE_FLASH_MS } from '../game/constants';
+import { comboMultiplier, createInitialState, handleTap, stepGame } from '../game/engine';
+import type { CaptureKind, DeathCause, GameState, Phase, Planet } from '../game/types';
 import { GameCanvas } from '../rendering/GameCanvas';
+import { zonePalette } from '../rendering/zones';
 
 const DEATH_MESSAGES: Record<DeathCause, string> = {
+  crash: 'SMACKED THE SURFACE',
   lost: 'LOST IN THE VOID',
   burned: 'BURNED UP IN ORBIT',
 };
@@ -24,10 +30,20 @@ export function GameScreen() {
 
   // React-side mirrors, updated only on discrete events (never per frame).
   const [uiScore, setUiScore] = useState(0);
+  const [uiCombo, setUiCombo] = useState(0);
   const [uiPhase, setUiPhase] = useState<Phase>('orbiting');
   const [uiDeathCause, setUiDeathCause] = useState<DeathCause | null>(null);
+  const [zoneFlash, setZoneFlash] = useState<string | null>(null);
+  const zoneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Planet window changes on generation/prune (a few times per capture at most).
   const [planets, setPlanets] = useState<Planet[]>(initialState.planets);
+
+  useEffect(() => {
+    initAudio();
+    return () => {
+      if (zoneTimer.current !== null) clearTimeout(zoneTimer.current);
+    };
+  }, []);
 
   useFrameCallback((frame) => {
     const dt = Math.min((frame.timeSincePreviousFrame ?? 16.7) / 1000, MAX_FRAME_DT_S);
@@ -37,6 +53,26 @@ export function GameScreen() {
     stepGame(s, dt);
     gameState.value = s;
   });
+
+  const onRelease = () => {
+    sfxRelease();
+    hapticRelease();
+  };
+  const onCapture = (kind: CaptureKind, comboLinks: number) => {
+    sfxCapture(kind, comboLinks);
+    hapticCapture(kind);
+  };
+  const onDeath = () => {
+    sfxDeath();
+    hapticDeath();
+  };
+  const onZone = (zoneIndex: number) => {
+    sfxZone();
+    hapticZone();
+    setZoneFlash(zonePalette(zoneIndex).name);
+    if (zoneTimer.current !== null) clearTimeout(zoneTimer.current);
+    zoneTimer.current = setTimeout(() => setZoneFlash(null), ZONE_FLASH_MS);
+  };
 
   const tap = Gesture.Tap().onBegin(() => {
     // onBegin fires on touch-down (not release) — lowest possible input latency.
@@ -50,11 +86,42 @@ export function GameScreen() {
     },
   );
   useAnimatedReaction(
+    () => gameState.value.comboLinks,
+    (links, prev) => {
+      if (links !== prev) runOnJS(setUiCombo)(links);
+    },
+  );
+  useAnimatedReaction(
     () => gameState.value.phase,
     (phase, prev) => {
       if (phase !== prev) {
         runOnJS(setUiPhase)(phase);
-        if (phase === 'dead') runOnJS(setUiDeathCause)(gameState.value.deathCause);
+        if (phase === 'dead') {
+          runOnJS(setUiDeathCause)(gameState.value.deathCause);
+          if (prev !== null) runOnJS(onDeath)();
+        }
+      }
+    },
+  );
+  useAnimatedReaction(
+    () => gameState.value.lastReleaseAt,
+    (t, prev) => {
+      if (prev !== null && t !== prev && t >= 0) runOnJS(onRelease)();
+    },
+  );
+  useAnimatedReaction(
+    () => gameState.value.lastCaptureAt,
+    (t, prev) => {
+      if (prev !== null && t !== prev && t >= 0) {
+        runOnJS(onCapture)(gameState.value.captureKind, gameState.value.comboLinks);
+      }
+    },
+  );
+  useAnimatedReaction(
+    () => gameState.value.zoneChangedAt,
+    (t, prev) => {
+      if (prev !== null && t !== prev && t >= 0) {
+        runOnJS(onZone)(gameState.value.zoneIndex);
       }
     },
   );
@@ -67,26 +134,44 @@ export function GameScreen() {
     },
   );
 
+  const multiplier = comboMultiplier(uiCombo);
+
   return (
     <GestureDetector gesture={tap}>
       <View style={styles.root}>
         <GameCanvas width={width} height={height} planets={planets} gameState={gameState} />
         <View style={styles.hud} pointerEvents="none">
           <Text style={styles.score}>{uiScore}</Text>
+          {multiplier >= 2 && <Text style={styles.combo}>×{multiplier}</Text>}
         </View>
+        {zoneFlash !== null && (
+          <Animated.View
+            entering={FadeIn.duration(250)}
+            exiting={FadeOut.duration(450)}
+            style={styles.zoneFlashWrap}
+            pointerEvents="none"
+          >
+            <Text style={styles.zoneName}>{zoneFlash}</Text>
+          </Animated.View>
+        )}
         {uiPhase === 'orbiting' && uiScore === 0 && (
           <View style={styles.hintWrap} pointerEvents="none">
             <Text style={styles.hint}>tap to release</Text>
           </View>
         )}
         {uiPhase === 'dead' && (
-          <View style={styles.deathOverlay} pointerEvents="none">
+          <Animated.View
+            entering={FadeIn.delay(DEATH_OVERLAY_DELAY_MS).duration(300)}
+            exiting={FadeOut.duration(120)}
+            style={styles.deathOverlay}
+            pointerEvents="none"
+          >
             <Text style={styles.deathCause}>
               {uiDeathCause !== null ? DEATH_MESSAGES[uiDeathCause] : ''}
             </Text>
             <Text style={styles.deathScore}>{uiScore}</Text>
             <Text style={styles.retry}>tap to try again</Text>
-          </View>
+          </Animated.View>
         )}
       </View>
     </GestureDetector>
@@ -110,6 +195,26 @@ const styles = StyleSheet.create({
     fontSize: 44,
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
+  },
+  combo: {
+    color: '#7DF9FF',
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginTop: -2,
+  },
+  zoneFlashWrap: {
+    position: 'absolute',
+    top: '30%',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  zoneName: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 26,
+    fontWeight: '900',
+    letterSpacing: 6,
   },
   hintWrap: {
     position: 'absolute',

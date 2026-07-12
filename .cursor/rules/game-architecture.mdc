@@ -39,11 +39,18 @@ inside the UI-thread frame callback aborts the process).
 Capture is decided by **closest approach** of the ball's straight flight line to a
 planet center (point-to-line distance):
 
-- path enters the planet body → capture at the surface impact point (+1).
-  *No crash deaths (changed from the original design doc at the user's request);
-  the only deaths are lost-in-space and orbit-decay burn-up.*
-- planet radius ≤ closest approach ≤ ring radius → capture into orbit (+1)
+- closest approach < planet radius → crash (death)
+- planet radius ≤ closest approach ≤ ring radius → capture into orbit
 - beyond ring radius → sails past; off-screen with no capture → lost (death)
+
+To keep this fair, a short dashed tangent aim line is drawn from the ball while
+orbiting (rendering-only — the sim never reads it). Crash deaths were briefly
+removed, then restored together with the aim line: the line fixes the
+confusion-difficulty, crashes keep the aiming skill.
+
+Scoring is split from progression: `planetsPassed` drives every difficulty
+dial and zones; `score` is points (capture × combo multiplier + graze/perfect
+bonuses). Never feed `score` into difficulty.
 
 On capture: orbit direction follows approach direction; orbit radius snaps to the
 planet's fixed ring (v1). Release velocity is the orbit tangent.

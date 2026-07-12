@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'bun:test';
-import { BALL_RADIUS, GRACE_AFTER_CAPTURE_S } from './constants';
+import {
+  BALL_RADIUS,
+  COMBO_MULTIPLIER_CAP,
+  GRACE_AFTER_CAPTURE_S,
+  GRAZE_POINTS,
+  PERFECT_POINTS,
+} from './constants';
 import { orbitDecayRate } from './difficulty';
 import { createInitialState, handleTap, stepGame } from './engine';
 import { closestApproachOnSegment, segmentCircleEntry } from './geometry';
@@ -35,10 +41,20 @@ function makeState(planets: Planet[], overrides: Partial<GameState>): GameState 
     graceUntil: 0,
     ballPos: { x: 0, y: 0 },
     velocity: { x: 0, y: 0 },
+    planetsPassed: 0,
     score: 0,
+    comboLinks: 0,
+    revolutions: 0,
+    zoneIndex: 0,
     time: 0,
     deathTime: 0,
     deathCause: null,
+    lastReleaseAt: -99,
+    lastCaptureAt: -99,
+    captureKind: 0,
+    capturePos: { x: 0, y: 0 },
+    zoneChangedAt: -99,
+    effectSeed: 1,
     rngState: 1,
     nextPlanetId: 1000,
     ...overrides,
@@ -56,7 +72,7 @@ const planet: Planet = {
   id: 0,
   center: { x: 200, y: 400 },
   radius: 20,
-  ringRadius: 50,
+  ringRadius: 50, // band = 30, center at distance 35, perfect window ±3.75
   color: '#fff',
 };
 
@@ -87,14 +103,18 @@ describe('geometry', () => {
 });
 
 describe('flight resolution', () => {
-  test('path grazing the capture band gets captured, +1 score, grace granted', () => {
+  test('path grazing the capture band gets captured, +1, grace granted', () => {
     // Flying right along y=440: closest approach to (200,400) is 40 — inside band (20, 50].
     const s = makeState([planet], { ballPos: { x: 0, y: 440 }, velocity: { x: 520, y: 0 } });
     runUntilSettled(s);
     expect(s.phase).toBe('orbiting');
-    expect(s.score).toBe(1);
+    expect(s.planetsPassed).toBe(1);
+    expect(s.score).toBe(1); // no combo, approach 40 is neither graze nor perfect
+    expect(s.captureKind).toBe(0);
     expect(s.currentPlanetId).toBe(0);
     expect(s.orbitRadius).toBeCloseTo(planet.ringRadius);
+    expect(s.revolutions).toBe(0);
+    expect(s.lastCaptureAt).toBeCloseTo(s.time);
     expect(s.graceUntil).toBeGreaterThanOrEqual(s.time);
     expect(s.graceUntil).toBeLessThanOrEqual(s.time + GRACE_AFTER_CAPTURE_S);
     // Snapped onto the ring.
@@ -114,24 +134,15 @@ describe('flight resolution', () => {
     expect(above.direction).toBe(1);
   });
 
-  test('direct body hit still captures into orbit at the impact angle', () => {
+  test('path through the planet body crashes at the surface', () => {
     const s = makeState([planet], { ballPos: { x: 0, y: 405 }, velocity: { x: 520, y: 0 } });
     runUntilSettled(s);
-    expect(s.phase).toBe('orbiting');
-    expect(s.score).toBe(1);
-    expect(s.currentPlanetId).toBe(0);
-    // Snapped out to the ring, on the side the ball came from.
+    expect(s.phase).toBe('dead');
+    expect(s.deathCause).toBe('crash');
+    expect(s.planetsPassed).toBe(0);
     const dx = s.ballPos.x - planet.center.x;
     const dy = s.ballPos.y - planet.center.y;
-    expect(Math.hypot(dx, dy)).toBeCloseTo(planet.ringRadius);
-    expect(s.ballPos.x).toBeLessThan(planet.center.x);
-  });
-
-  test('perfectly head-on hit through the center captures too', () => {
-    const s = makeState([planet], { ballPos: { x: 0, y: 400 }, velocity: { x: 520, y: 0 } });
-    runUntilSettled(s);
-    expect(s.phase).toBe('orbiting');
-    expect(s.score).toBe(1);
+    expect(Math.hypot(dx, dy)).toBeCloseTo(planet.radius, 0);
   });
 
   test('path beyond the band sails past and dies off the viewport', () => {
@@ -160,13 +171,112 @@ describe('flight resolution', () => {
   });
 });
 
+describe('scoring', () => {
+  test('quick release increments the streak and stamps the event', () => {
+    const s = makeState([planet], {
+      phase: 'orbiting',
+      currentPlanetId: 0,
+      orbitRadius: planet.ringRadius,
+      revolutions: 0.2,
+      comboLinks: 2,
+      time: 4,
+      ballPos: { x: 250, y: 400 },
+    });
+    const released = handleTap(s);
+    expect(released.comboLinks).toBe(3);
+    expect(released.lastReleaseAt).toBe(4);
+  });
+
+  test('streak dies the moment the combo window closes, while still orbiting', () => {
+    const s = makeState([planet], {
+      phase: 'orbiting',
+      currentPlanetId: 0,
+      orbitRadius: planet.ringRadius,
+      comboLinks: 3,
+      ballPos: { x: 250, y: 400 },
+    });
+    // Half a revolution at 2.6 rad/s ≈ 1.21s.
+    for (let i = 0; i < 60; i++) stepGame(s, DT); // 1s — window still open
+    expect(s.comboLinks).toBe(3);
+    for (let i = 0; i < 30; i++) stepGame(s, DT); // 1.5s — window closed
+    expect(s.phase).toBe('orbiting');
+    expect(s.comboLinks).toBe(0);
+  });
+
+  test('capture scores capture points times the multiplier', () => {
+    const s = makeState([planet], {
+      ballPos: { x: 0, y: 440 },
+      velocity: { x: 520, y: 0 },
+      comboLinks: 3,
+    });
+    runUntilSettled(s);
+    expect(s.phase).toBe('orbiting');
+    expect(s.score).toBe(3); // 1 × ×3
+    expect(s.planetsPassed).toBe(1);
+  });
+
+  test('multiplier is capped', () => {
+    const s = makeState([planet], {
+      ballPos: { x: 0, y: 440 },
+      velocity: { x: 520, y: 0 },
+      comboLinks: 99,
+    });
+    runUntilSettled(s);
+    expect(s.score).toBe(COMBO_MULTIPLIER_CAP);
+  });
+
+  test('skimming the surface earns the graze bonus', () => {
+    // Approach 24 → 4px above the surface (GRAZE_MARGIN 8), below perfect window.
+    const s = makeState([planet], { ballPos: { x: 0, y: 424 }, velocity: { x: 520, y: 0 } });
+    runUntilSettled(s);
+    expect(s.phase).toBe('orbiting');
+    expect(s.captureKind).toBe(1);
+    expect(s.score).toBe(1 + GRAZE_POINTS);
+  });
+
+  test('band-center capture earns the perfect bonus', () => {
+    // Approach 35 = band center exactly.
+    const s = makeState([planet], { ballPos: { x: 0, y: 435 }, velocity: { x: 520, y: 0 } });
+    runUntilSettled(s);
+    expect(s.phase).toBe('orbiting');
+    expect(s.captureKind).toBe(2);
+    expect(s.score).toBe(1 + PERFECT_POINTS);
+  });
+
+  test('crossing a zone boundary stamps the zone change', () => {
+    const s = makeState([planet], {
+      ballPos: { x: 0, y: 440 },
+      velocity: { x: 520, y: 0 },
+      planetsPassed: 19,
+    });
+    runUntilSettled(s);
+    expect(s.planetsPassed).toBe(20);
+    expect(s.zoneIndex).toBe(1);
+    expect(s.zoneChangedAt).toBeCloseTo(s.time);
+  });
+
+  test('difficulty follows planetsPassed, not points', () => {
+    const s = makeState([planet], {
+      phase: 'orbiting',
+      currentPlanetId: 0,
+      orbitRadius: planet.ringRadius,
+      score: 9999,
+      planetsPassed: 0,
+      ballPos: { x: 250, y: 400 },
+    });
+    for (let i = 0; i < 300; i++) stepGame(s, DT);
+    expect(s.phase).toBe('orbiting');
+    expect(s.orbitRadius).toBeCloseTo(planet.ringRadius); // fair start: no decay
+  });
+});
+
 describe('orbit decay', () => {
   test('camping burns up on the surface at the decay rate', () => {
     const s = makeState([planet], {
       phase: 'orbiting',
       currentPlanetId: 0,
       orbitRadius: planet.ringRadius,
-      score: 10,
+      planetsPassed: 10,
       ballPos: { x: 250, y: 400 },
     });
     const rate = orbitDecayRate(10);
@@ -186,7 +296,7 @@ describe('orbit decay', () => {
       phase: 'orbiting',
       currentPlanetId: 0,
       orbitRadius: planet.ringRadius,
-      score: 10,
+      planetsPassed: 10,
       graceUntil: 5,
       ballPos: { x: 250, y: 400 },
     });
@@ -194,19 +304,6 @@ describe('orbit decay', () => {
     expect(s.orbitRadius).toBeCloseTo(planet.ringRadius);
     for (let i = 0; i < 300; i++) stepGame(s, DT); // past grace at t=5
     expect(s.orbitRadius).toBeLessThan(planet.ringRadius);
-  });
-
-  test('no decay during the fair start', () => {
-    const s = makeState([planet], {
-      phase: 'orbiting',
-      currentPlanetId: 0,
-      orbitRadius: planet.ringRadius,
-      score: 0,
-      ballPos: { x: 250, y: 400 },
-    });
-    for (let i = 0; i < 300; i++) stepGame(s, DT);
-    expect(s.phase).toBe('orbiting');
-    expect(s.orbitRadius).toBeCloseTo(planet.ringRadius);
   });
 });
 
@@ -263,5 +360,6 @@ describe('full run on the real level', () => {
     const restarted = handleTap(s);
     expect(restarted.phase).toBe('orbiting');
     expect(restarted.score).toBe(0);
+    expect(restarted.planetsPassed).toBe(0);
   });
 });

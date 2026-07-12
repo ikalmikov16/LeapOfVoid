@@ -28,7 +28,8 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "sfx": "bun scripts/generate-sfx.ts"
   },
   "private": true
 }

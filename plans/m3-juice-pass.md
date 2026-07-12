@@ -1,6 +1,14 @@
 # M3 — Juice Pass: Trail, Particles, Shake, Haptics, SFX, Bonus Scoring, Zones
 
-**Status: Draft** (awaiting sign-off)
+**Status: Done** (implemented + unit-tested; SFX character and effect timing
+await on-device tuning. Step 7's graze slow-mo was skipped — revisit only if
+grazes feel unrewarded after playtesting.)
+
+> Pre-M3 changes folded in after discussion: crash deaths are restored (the
+> no-crash experiment is over) and a short dashed tangent **aim line** ships
+> with this milestone — it fixes the game's confusion-difficulty so crashes
+> can stay. Combo window tightened to half a revolution. Graze redefined back
+> to the design doc's intent (see below).
 
 ## 1. Goal
 
@@ -56,23 +64,27 @@ Until now `score == planetsPassed`. Bonuses break that, so they split:
 
 ### Combo ("hot streak")
 
-- Engine accumulates `revolutions` (|angle delta| / 2π since capture).
-- Release with `revolutions < 1` → `comboLinks += 1`; a full revolution before
-  releasing resets `comboLinks` to 0 **at the moment the revolution completes**
-  (trail visibly cools the instant the streak dies — telegraphed, clip-friendly).
-- Death obviously resets. Multiplier = `min(1 + comboLinks, COMBO_CAP)`.
+- Engine accumulates `revolutions` (angle swept / 2π since capture).
+- Release with `revolutions < 0.5` → `comboLinks += 1`. **Half** a revolution,
+  not a full one: orbit decay already forces release within ~a revolution, so
+  a full-rev window would make the multiplier permanently-on. Half a rev is a
+  real choice — take the first usable tangent or wait for the ideal one and
+  lose the streak.
+- The streak resets to 0 **the moment the window closes** while still
+  orbiting (trail visibly cools while you hesitate — telegraphed, clip-friendly).
+- Death obviously resets. Multiplier = `clamp(comboLinks, 1, COMBO_CAP=5)` —
+  a single quick hop is ×1; chains of 2+ show ×2, ×3…
 
-### Graze and perfect under the no-crash rule
+### Graze and perfect (crash deaths restored)
 
-The design doc wrote graze/perfect assuming body hits kill. They don't anymore
-(settled with the user during M2), so:
+With crash deaths back, the design doc's original graze intent works again —
+rewarding *risky proximity to the surface*:
 
-- **Graze** = flying past a planet you are *not* captured by, with closest
-  approach within `GRAZE_MARGIN` (~12px) *outside* its ring. Rewards threading
-  between planets: sparks at the near-miss point + bonus. One graze per planet
-  per flight.
+- **Graze** = captured with closest approach within `GRAZE_MARGIN` (~8px) of
+  the planet surface — a few pixels from a crash. Sparks + bonus.
 - **Perfect** = captured with closest approach within the middle ~25% of the
-  capture band. Body-slam captures are neutral: no bonus, no penalty.
+  capture band — the precision reward. Perfect beats graze if both apply
+  (only possible on very narrow late-game bands).
 
 ### Effects architecture: timestamps + pure functions, no event queues
 
@@ -80,9 +92,10 @@ The sim already runs on the UI thread with a no-allocation frame contract, so
 effects piggyback on it:
 
 - Engine stamps discrete events into `GameState`: `lastReleaseAt`,
-  `lastCaptureAt` + position, `lastGrazeAt` + position, `lastPerfectAt`,
-  death time (exists) + position, `zoneChangedAt`. Replacing a small object on
-  a discrete event is fine; nothing allocates per frame.
+  `lastCaptureAt` + `capturePos` + `captureKind` (normal/graze/perfect),
+  death time (exists; ball position doubles as death position), and
+  `zoneChangedAt`. Replacing a small object on a discrete event is fine;
+  nothing allocates per frame.
 - **Every visual effect is a pure function of `(state, now)`** rendered via
   Skia derived values — no particle arrays are simulated. A burst renders N
   particles whose positions are computed from `(origin, elapsed, particle
@@ -90,10 +103,11 @@ effects piggyback on it:
   friendly. Shake is a decaying sinusoid of `time - deathTime` applied to the
   existing world-translate group. Flash is an opacity curve on a full-screen
   rect. Squash/stretch is a scale matrix from `time - lastReleaseAt`.
-- **Trail** is the one per-frame effect: a fixed-size preallocated ring buffer
-  of recent ball positions in its own shared value, written in the existing
-  frame callback (not in `GameState` — it's presentation, not simulation).
-  Drawn as fading/shrinking circles; count and opacity scale with combo.
+- **Trail** needs no buffer at all: recent path history is *analytic* — a
+  straight line back along the velocity while flying, an arc back along the
+  orbit while orbiting. Each trail dot derives its position from the current
+  state directly (also sidesteps mutating shared-value internals, which the
+  worklets runtime freezes). Opacity scales with combo heat.
 - Haptics/SFX are JS-side: `useAnimatedReaction` on the event timestamps →
   `runOnJS` into an effects module. One frame of latency is imperceptible.
 
@@ -124,11 +138,11 @@ effects piggyback on it:
 
 ### State/type changes
 
-`GameState` gains: `planetsPassed`, `comboLinks`, `revolutions`,
-`lastReleaseAt`, `lastCaptureAt`, `captureEffectPos`, `lastGrazeAt`,
-`grazeEffectPos`, `lastPerfectAt`, `deathPos`, `zoneChangedAt`,
-`effectSeed`, and (if slow-mo ships) `timeScale`. All primitives or
-replaced-on-event objects — the copy-then-mutate frame contract holds.
+`GameState` gains: `planetsPassed`, `comboLinks`, `revolutions`, `zoneIndex`,
+`lastReleaseAt`, `lastCaptureAt`, `captureKind`, `capturePos`,
+`zoneChangedAt`, `effectSeed`. All primitives or replaced-on-event objects —
+the copy-then-mutate frame contract holds. The effect seed is a hash (never a
+consumed rng draw), so generation determinism is independent of captures.
 
 ## 4. Implementation steps (game stays playable after each)
 

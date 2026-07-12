@@ -2,7 +2,9 @@ import {
   BlurMask,
   Canvas,
   Circle,
+  DashPathEffect,
   Group,
+  Line,
   LinearGradient,
   Points,
   Rect,
@@ -10,10 +12,24 @@ import {
   type SkPoint,
 } from '@shopify/react-native-skia';
 import { useMemo } from 'react';
-import { useDerivedValue, type SharedValue } from 'react-native-reanimated';
-import { BALL_RADIUS, COLORS } from '../game/constants';
+import { interpolateColor, useDerivedValue, type SharedValue } from 'react-native-reanimated';
+import {
+  AIM_LINE_LENGTH,
+  AIM_LINE_OPACITY,
+  AIM_LINE_START,
+  BALL_RADIUS,
+  COLORS,
+  FLASH_DURATION_S,
+  RELEASE_STRETCH_AMOUNT,
+  RELEASE_STRETCH_S,
+  SHAKE_AMPLITUDE,
+  SHAKE_DURATION_S,
+  ZONE_FADE_S,
+} from '../game/constants';
 import { findPlanet } from '../game/engine';
 import type { GameState, Planet } from '../game/types';
+import { CaptureBurst, DeathShatter, PerfectPulse, Trail } from './effects';
+import { zonePalette } from './zones';
 
 interface GameCanvasProps {
   width: number;
@@ -60,7 +76,7 @@ function PlanetView({ planet, gameState }: { planet: Planet; gameState: SharedVa
 }
 
 export function GameCanvas({ width, height, planets, gameState }: GameCanvasProps) {
-  // Screen-fixed starfield backdrop (parallax is an M3 concern).
+  // Screen-fixed starfield backdrop (parallax is a later flavor pass).
   const stars = useMemo(() => {
     const rand = mulberry32(1337);
     const dim: SkPoint[] = [];
@@ -72,7 +88,35 @@ export function GameCanvas({ width, height, planets, gameState }: GameCanvasProp
     return { dim, bright };
   }, [width, height]);
 
-  const worldTransform = useDerivedValue(() => [{ translateY: -gameState.value.cameraY }]);
+  // Background gradient cross-fades between zone palettes.
+  const bgColors = useDerivedValue(() => {
+    const s = gameState.value;
+    const cur = zonePalette(s.zoneIndex);
+    const e = s.time - s.zoneChangedAt;
+    if (s.zoneIndex === 0 || e >= ZONE_FADE_S) return [cur.bgTop, cur.bgBottom];
+    const prev = zonePalette(s.zoneIndex - 1);
+    const f = Math.max(0, Math.min(e / ZONE_FADE_S, 1));
+    return [
+      interpolateColor(f, [0, 1], [prev.bgTop, cur.bgTop]) as string,
+      interpolateColor(f, [0, 1], [prev.bgBottom, cur.bgBottom]) as string,
+    ];
+  });
+
+  // World translate + death shake (decaying wobble in screen space).
+  const worldTransform = useDerivedValue(() => {
+    const s = gameState.value;
+    let dx = 0;
+    let dy = 0;
+    if (s.phase === 'dead') {
+      const e = s.time - s.deathTime;
+      if (e >= 0 && e < SHAKE_DURATION_S) {
+        const damp = SHAKE_AMPLITUDE * (1 - e / SHAKE_DURATION_S) ** 2;
+        dx = damp * Math.sin(e * 47);
+        dy = damp * Math.cos(e * 61);
+      }
+    }
+    return [{ translateX: dx }, { translateY: -s.cameraY + dy }];
+  });
 
   // Live (decaying) orbit circle around the current planet.
   const orbitCx = useDerivedValue(
@@ -86,18 +130,59 @@ export function GameCanvas({ width, height, planets, gameState }: GameCanvasProp
     gameState.value.phase === 'orbiting' ? 0.65 : 0,
   );
 
+  // Dashed tangent aim line: where a release right now would send you.
+  const aimP1 = useDerivedValue(() => {
+    const s = gameState.value;
+    const tx = -Math.sin(s.angle) * s.direction;
+    const ty = Math.cos(s.angle) * s.direction;
+    return vec(s.ballPos.x + tx * AIM_LINE_START, s.ballPos.y + ty * AIM_LINE_START);
+  });
+  const aimP2 = useDerivedValue(() => {
+    const s = gameState.value;
+    const tx = -Math.sin(s.angle) * s.direction;
+    const ty = Math.cos(s.angle) * s.direction;
+    const len = AIM_LINE_START + AIM_LINE_LENGTH;
+    return vec(s.ballPos.x + tx * len, s.ballPos.y + ty * len);
+  });
+  const aimOpacity = useDerivedValue(() =>
+    gameState.value.phase === 'orbiting' ? AIM_LINE_OPACITY : 0,
+  );
+
+  // Squash/stretch: the ball elongates along its velocity right after release.
+  const ballOrigin = useDerivedValue(() =>
+    vec(gameState.value.ballPos.x, gameState.value.ballPos.y),
+  );
+  const ballTransform = useDerivedValue(() => {
+    const s = gameState.value;
+    let stretch = 0;
+    let rot = 0;
+    if (s.phase === 'flying') {
+      const e = s.time - s.lastReleaseAt;
+      if (e >= 0 && e < RELEASE_STRETCH_S) {
+        stretch = RELEASE_STRETCH_AMOUNT * (1 - e / RELEASE_STRETCH_S);
+      }
+      rot = Math.atan2(s.velocity.y, s.velocity.x);
+    }
+    return [{ rotate: rot }, { scaleX: 1 + stretch }, { scaleY: 1 - stretch * 0.5 }];
+  });
+
   const ballX = useDerivedValue(() => gameState.value.ballPos.x);
   const ballY = useDerivedValue(() => gameState.value.ballPos.y);
   const ballOpacity = useDerivedValue(() => (gameState.value.phase === 'dead' ? 0 : 1));
 
+  // White impact flash over everything at the moment of death.
+  const flashOpacity = useDerivedValue(() => {
+    const s = gameState.value;
+    if (s.phase !== 'dead') return 0;
+    const e = s.time - s.deathTime;
+    if (e < 0 || e > FLASH_DURATION_S) return 0;
+    return 0.55 * (1 - e / FLASH_DURATION_S);
+  });
+
   return (
     <Canvas style={{ width, height }}>
       <Rect x={0} y={0} width={width} height={height}>
-        <LinearGradient
-          start={vec(0, 0)}
-          end={vec(0, height)}
-          colors={[COLORS.bgTop, COLORS.bgBottom]}
-        />
+        <LinearGradient start={vec(0, 0)} end={vec(0, height)} colors={bgColors} />
       </Rect>
       <Points points={stars.dim} mode="points" color={COLORS.starDim} style="stroke" strokeWidth={1.6} strokeCap="round" opacity={0.5} />
       <Points points={stars.bright} mode="points" color={COLORS.starBright} style="stroke" strokeWidth={2.4} strokeCap="round" opacity={0.8} />
@@ -114,13 +199,21 @@ export function GameCanvas({ width, height, planets, gameState }: GameCanvasProp
           color={COLORS.ball}
           opacity={orbitOpacity}
         />
-        <Group opacity={ballOpacity}>
+        <Line p1={aimP1} p2={aimP2} color={COLORS.ball} strokeWidth={2} strokeCap="round" opacity={aimOpacity}>
+          <DashPathEffect intervals={[7, 8]} />
+        </Line>
+        <PerfectPulse gameState={gameState} />
+        <Trail gameState={gameState} />
+        <Group origin={ballOrigin} transform={ballTransform} opacity={ballOpacity}>
           <Circle cx={ballX} cy={ballY} r={BALL_RADIUS * 2.4} color={COLORS.ballGlow} opacity={0.35}>
             <BlurMask blur={10} style="normal" />
           </Circle>
           <Circle cx={ballX} cy={ballY} r={BALL_RADIUS} color={COLORS.ball} />
         </Group>
+        <CaptureBurst gameState={gameState} />
+        <DeathShatter gameState={gameState} />
       </Group>
+      <Rect x={0} y={0} width={width} height={height} color="#FFFFFF" opacity={flashOpacity} />
     </Canvas>
   );
 }

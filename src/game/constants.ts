@@ -16,6 +16,27 @@ export const RESTART_COOLDOWN_S = 0.25;
 /** Clamp frame delta so a hitch can't tunnel the ball through a planet. */
 export const MAX_FRAME_DT_S = 1 / 20;
 
+// --- Aim line (dashed tangent projection while orbiting) ---
+
+/** Gap between ball center and the start of the line. */
+export const AIM_LINE_START = 14;
+/** Length of the dashed hint — long enough to read direction, too short to solve the jump. */
+export const AIM_LINE_LENGTH = 90;
+export const AIM_LINE_OPACITY = 0.5;
+
+// --- Scoring (score = points; planetsPassed drives difficulty) ---
+
+export const CAPTURE_POINTS = 1;
+export const GRAZE_POINTS = 2;
+export const PERFECT_POINTS = 3;
+/** Release within this fraction of a revolution to keep the streak alive. */
+export const COMBO_WINDOW_REVOLUTIONS = 0.5;
+export const COMBO_MULTIPLIER_CAP = 5;
+/** Closest approach within this of the surface = graze (nearly died). */
+export const GRAZE_MARGIN = 8;
+/** Middle fraction of the capture band that counts as a perfect capture. */
+export const PERFECT_BAND_FRACTION = 0.25;
+
 // --- Camera ---
 
 /** While orbiting, the current planet sits this fraction down the screen. */
@@ -83,6 +104,30 @@ export const DECAY_GROWTH = 0.1;
 export const DECAY_MAX = 14;
 /** Decay pauses for this long after every capture. */
 export const GRACE_AFTER_CAPTURE_S = 2;
+
+// --- Effects (all pure functions of time-since-event; no simulated particles) ---
+
+export const TRAIL_COUNT = 14;
+/** Seconds of path history between consecutive trail dots. */
+export const TRAIL_DT = 0.026;
+export const RELEASE_STRETCH_S = 0.18;
+export const RELEASE_STRETCH_AMOUNT = 0.45;
+export const BURST_DURATION_S = 0.55;
+export const BURST_SPEED = 170;
+export const BURST_PARTICLES = 12;
+export const SHATTER_DURATION_S = 0.7;
+export const SHATTER_SPEED = 240;
+export const SHATTER_PARTICLES = 14;
+export const FLASH_DURATION_S = 0.22;
+export const SHAKE_DURATION_S = 0.45;
+export const SHAKE_AMPLITUDE = 9;
+export const PERFECT_PULSE_S = 0.5;
+/** Background gradient cross-fade time on zone change. */
+export const ZONE_FADE_S = 1.5;
+/** How long the zone name flashes in the HUD (JS side). */
+export const ZONE_FLASH_MS = 2200;
+/** Delay before the death overlay fades in, so the shatter reads first. */
+export const DEATH_OVERLAY_DELAY_MS = 350;
 
 // --- Look ---
 
