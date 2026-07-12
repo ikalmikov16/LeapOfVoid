@@ -9,10 +9,21 @@ import Animated, {
   useFrameCallback,
   useSharedValue,
 } from 'react-native-reanimated';
-import { sfxCapture, sfxDeath, sfxRelease, sfxZone } from '../audio/sfx';
-import { hapticCapture, hapticDeath, hapticRelease, hapticZone } from '../effects/haptics';
-import { DEATH_OVERLAY_DELAY_MS, MAX_FRAME_DT_S, ZONE_FLASH_MS } from '../game/constants';
-import { comboMultiplier, createInitialState, handleTap, stepGame } from '../game/engine';
+import { sfxCapture, sfxDeath, sfxFlyby, sfxRelease, sfxZone } from '../audio/sfx';
+import {
+  hapticCapture,
+  hapticDeath,
+  hapticFlyby,
+  hapticRelease,
+  hapticZone,
+} from '../effects/haptics';
+import {
+  DEATH_OVERLAY_DELAY_MS,
+  HEAT_COLORS,
+  MAX_FRAME_DT_S,
+  ZONE_FLASH_MS,
+} from '../game/constants';
+import { createInitialState, handleTap, stepGame } from '../game/engine';
 import type { CaptureKind, DeathCause, GameState, Phase, Planet } from '../game/types';
 import { GameCanvas } from '../rendering/GameCanvas';
 import { zonePalette } from '../rendering/zones';
@@ -31,7 +42,7 @@ export function GameScreen() {
 
   // React-side mirrors, updated only on discrete events (never per frame).
   const [uiScore, setUiScore] = useState(0);
-  const [uiCombo, setUiCombo] = useState(0);
+  const [uiHeat, setUiHeat] = useState(0);
   const [uiPhase, setUiPhase] = useState<Phase>('orbiting');
   const [uiDeathCause, setUiDeathCause] = useState<DeathCause | null>(null);
   const [uiPlanets, setUiPlanets] = useState(0);
@@ -62,9 +73,13 @@ export function GameScreen() {
     sfxRelease();
     hapticRelease();
   };
-  const onCapture = (kind: CaptureKind, comboLinks: number) => {
-    sfxCapture(kind, comboLinks);
+  const onCapture = (kind: CaptureKind, heat: number) => {
+    sfxCapture(kind, heat);
     hapticCapture(kind);
+  };
+  const onFlyby = (heat: number) => {
+    sfxFlyby(heat);
+    hapticFlyby();
   };
   const onDeath = (score: number, planetsPassed: number) => {
     sfxDeath();
@@ -114,9 +129,17 @@ export function GameScreen() {
     },
   );
   useAnimatedReaction(
-    () => gameState.value.comboLinks,
-    (links, prev) => {
-      if (links !== prev) runOnJS(setUiCombo)(links);
+    () => gameState.value.heat,
+    (heat, prev) => {
+      if (heat !== prev) runOnJS(setUiHeat)(heat);
+    },
+  );
+  useAnimatedReaction(
+    () => gameState.value.lastFlybyAt,
+    (t, prev) => {
+      if (prev !== null && t !== prev && t >= 0) {
+        runOnJS(onFlyby)(gameState.value.heat);
+      }
     },
   );
   useAnimatedReaction(
@@ -143,7 +166,7 @@ export function GameScreen() {
     () => gameState.value.lastCaptureAt,
     (t, prev) => {
       if (prev !== null && t !== prev && t >= 0) {
-        runOnJS(onCapture)(gameState.value.captureKind, gameState.value.comboLinks);
+        runOnJS(onCapture)(gameState.value.captureKind, gameState.value.heat);
       }
     },
   );
@@ -164,15 +187,15 @@ export function GameScreen() {
     },
   );
 
-  const multiplier = comboMultiplier(uiCombo);
-
   return (
     <GestureDetector gesture={tap}>
       <View style={styles.root}>
         <GameCanvas width={width} height={height} planets={planets} gameState={gameState} />
         <View style={styles.hud} pointerEvents="none">
           <Text style={styles.score}>{uiScore}</Text>
-          {multiplier >= 2 && <Text style={styles.combo}>×{multiplier}</Text>}
+          {uiHeat > 0 && (
+            <Text style={[styles.heatBadge, { color: HEAT_COLORS[uiHeat] }]}>×{1 + uiHeat}</Text>
+          )}
         </View>
         {zoneFlash !== null && (
           <Animated.View
@@ -245,8 +268,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
   },
-  combo: {
-    color: '#7DF9FF',
+  heatBadge: {
     fontSize: 18,
     fontWeight: '800',
     letterSpacing: 1,

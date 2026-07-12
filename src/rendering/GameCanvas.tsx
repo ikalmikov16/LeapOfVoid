@@ -20,6 +20,8 @@ import {
   BALL_RADIUS,
   COLORS,
   FLASH_DURATION_S,
+  FLYBY_PULSE_S,
+  HEAT_COLORS,
   RELEASE_STRETCH_AMOUNT,
   RELEASE_STRETCH_S,
   SHAKE_AMPLITUDE,
@@ -170,6 +172,23 @@ export function GameCanvas({ width, height, planets, gameState }: GameCanvasProp
   const ballY = useDerivedValue(() => gameState.value.ballPos.y);
   const ballOpacity = useDerivedValue(() => (gameState.value.phase === 'dead' ? 0 : 1));
 
+  // Comet heat: the glow IS the multiplier gauge — color steps with heat,
+  // and each flyby pops the glow for a beat.
+  const glowColor = useDerivedValue(() => HEAT_COLORS[gameState.value.heat]);
+  const flybyPop = (s: GameState): number => {
+    'worklet';
+    const e = s.time - s.lastFlybyAt;
+    return e >= 0 && e < FLYBY_PULSE_S ? 1 - e / FLYBY_PULSE_S : 0;
+  };
+  const glowR = useDerivedValue(() => {
+    const s = gameState.value;
+    return BALL_RADIUS * 2.4 * (1 + 0.12 * s.heat + 0.5 * flybyPop(s));
+  });
+  const glowOpacity = useDerivedValue(() => {
+    const s = gameState.value;
+    return 0.35 + 0.07 * s.heat + 0.3 * flybyPop(s);
+  });
+
   // White impact flash over everything at the moment of death.
   const flashOpacity = useDerivedValue(() => {
     const s = gameState.value;
@@ -205,7 +224,7 @@ export function GameCanvas({ width, height, planets, gameState }: GameCanvasProp
         <PerfectPulse gameState={gameState} />
         <Trail gameState={gameState} />
         <Group origin={ballOrigin} transform={ballTransform} opacity={ballOpacity}>
-          <Circle cx={ballX} cy={ballY} r={BALL_RADIUS * 2.4} color={COLORS.ballGlow} opacity={0.35}>
+          <Circle cx={ballX} cy={ballY} r={glowR} color={glowColor} opacity={glowOpacity}>
             <BlurMask blur={10} style="normal" />
           </Circle>
           <Circle cx={ballX} cy={ballY} r={BALL_RADIUS} color={COLORS.ball} />

@@ -49,10 +49,17 @@ removed, then restored together with the aim line: the line fixes the
 confusion-difficulty, crashes keep the aiming skill.
 
 Scoring is split from progression: `planetsPassed` drives every difficulty
-dial and zones; `score` is points (capture × combo multiplier + graze/perfect
-+ skip bonuses). Never feed `score` into difficulty. Planet ids are chain
-ordinals: `planetsPassed` = the highest id reached (skips advance it fully;
-captures at/below the high-water mark score zero — prevents bounce-farming).
+dial and zones; `score` is points. Never feed `score` into difficulty. Planet
+ids are chain ordinals: `planetsPassed` = the highest id reached (skips
+advance it fully; captures at/below the high-water mark score zero — prevents
+bounce-farming).
+
+Points per capture = `(capture + quick/perfect/graze flat bonuses) × (1 + heat)`.
+`heat` (0–4) is the one multiplier: +1 per planet flown past mid-jump (flyby =
+ball clears the top of a higher planet's ring — it can never fire for the
+planet being landed on), −1 per revolution camped. Heat also drives the comet
+visuals (ball glow / trail color via `HEAT_COLORS`), the HUD ×N badge, and the
+SFX pitch — one variable, four consumers.
 
 On capture: orbit direction follows approach direction; the orbit starts exactly
 at the capture point and settles out to the planet's fixed ring over

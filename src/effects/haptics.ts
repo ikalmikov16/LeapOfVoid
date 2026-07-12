@@ -25,6 +25,12 @@ export function hapticCapture(kind: CaptureKind): void {
   }
 }
 
+/** One light tick per planet flown past mid-jump — quieter than any impact. */
+export function hapticFlyby(): void {
+  if (!enabled()) return;
+  Haptics.selectionAsync();
+}
+
 export function hapticDeath(): void {
   if (!enabled()) return;
   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);

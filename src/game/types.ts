@@ -54,10 +54,17 @@ export interface GameState {
 
   /** Planets reached this run — drives ALL difficulty dials and zones. */
   planetsPassed: number;
-  /** Points (captures × combo multiplier + bonuses) — the big HUD number. */
+  /** Points ((capture + bonuses) × (1 + heat)) — the big HUD number. */
   score: number;
-  /** Consecutive quick releases (within the combo window). */
-  comboLinks: number;
+  /**
+   * The score multiplier minus one, and the comet visual: +1 per planet
+   * flown past mid-jump (cap HEAT_MAX), −1 per revolution camped.
+   */
+  heat: number;
+  /** Planets cleared during the current flight (high-water; resets on release). */
+  flightSkips: number;
+  /** Whether the current/last flight left within the quick window. */
+  releasedQuick: boolean;
   /** Revolutions completed on the current orbit (fraction; resets on capture). */
   revolutions: number;
   /** Current zone (planetsPassed ÷ 20); visuals key off changes to this. */
@@ -72,6 +79,8 @@ export interface GameState {
   // "time since event" starts huge; effects render as pure functions of these.
   lastReleaseAt: number;
   lastCaptureAt: number;
+  /** Last mid-flight planet pass (heat tick) — drives the glow pop. */
+  lastFlybyAt: number;
   captureKind: CaptureKind;
   /** Where the ball snapped on the last capture (world coords). */
   capturePos: Vec2;

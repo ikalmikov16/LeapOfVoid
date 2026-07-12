@@ -19,19 +19,20 @@ import {
   CAPTURE_OMEGA_MAX,
   CAPTURE_POINTS,
   CAPTURE_SETTLE_S,
-  COMBO_MULTIPLIER_CAP,
-  COMBO_WINDOW_REVOLUTIONS,
   FLIGHT_SPEED,
   GRACE_AFTER_CAPTURE_S,
   GRAZE_MARGIN,
   GRAZE_POINTS,
+  HEAT_COOL_REVOLUTIONS,
+  HEAT_MAX,
   OFFSCREEN_MARGIN,
   OFFSCREEN_TOP_SCREENS,
   PERFECT_BAND_FRACTION,
   PERFECT_POINTS,
   PLANET_COLORS,
+  QUICK_POINTS,
+  QUICK_WINDOW_REVOLUTIONS,
   RESTART_COOLDOWN_S,
-  SKIP_POINTS,
 } from './constants';
 import {
   captureBandWidth,
@@ -54,12 +55,6 @@ export function findPlanet(planets: Planet[], id: number): Planet | null {
   return null;
 }
 
-/** Current combo multiplier: the first quick hop already earns ×2. */
-export function comboMultiplier(comboLinks: number): number {
-  'worklet';
-  return Math.min(1 + comboLinks, COMBO_MULTIPLIER_CAP);
-}
-
 export function createInitialState(width: number, height: number, seed?: number): GameState {
   'worklet';
   const state: GameState = {
@@ -79,7 +74,9 @@ export function createInitialState(width: number, height: number, seed?: number)
     velocity: { x: 0, y: 0 },
     planetsPassed: 0,
     score: 0,
-    comboLinks: 0,
+    heat: 0,
+    flightSkips: 0,
+    releasedQuick: false,
     revolutions: 0,
     zoneIndex: 0,
     time: 0,
@@ -87,6 +84,7 @@ export function createInitialState(width: number, height: number, seed?: number)
     deathCause: null,
     lastReleaseAt: -99,
     lastCaptureAt: -99,
+    lastFlybyAt: -99,
     captureKind: 0,
     capturePos: { x: 0, y: 0 },
     zoneChangedAt: -99,
@@ -115,11 +113,9 @@ export function createInitialState(width: number, height: number, seed?: number)
 
 function release(state: GameState): void {
   'worklet';
-  // Quick release keeps the streak alive; stepOrbit already killed it the
-  // moment the combo window closed, so only the increment lives here.
-  if (state.revolutions < COMBO_WINDOW_REVOLUTIONS) {
-    state.comboLinks += 1;
-  }
+  // The quick flag rides along to the capture, where it pays QUICK_POINTS.
+  state.releasedQuick = state.revolutions < QUICK_WINDOW_REVOLUTIONS;
+  state.flightSkips = 0;
   // Velocity is the orbit tangent: d/dt of (cos a, sin a) scaled by direction.
   state.velocity = {
     x: -Math.sin(state.angle) * state.direction * FLIGHT_SPEED,
@@ -135,7 +131,6 @@ function die(state: GameState, cause: DeathCause): void {
   state.phase = 'dead';
   state.deathCause = cause;
   state.deathTime = state.time;
-  state.comboLinks = 0;
 }
 
 function stepOrbit(state: GameState, dt: number): void {
@@ -175,13 +170,17 @@ function stepOrbit(state: GameState, dt: number): void {
     }
   }
   state.angle += state.direction * angularSpeed * dt;
-  // Track revolutions; the streak dies the instant the combo window closes
-  // (not at release), so the trail visibly cools while you hesitate.
-  // Bookkeeping uses the base speed so the settle whip after a deep graze
-  // can't eat into the combo window.
+  // Track revolutions with the base speed (the settle whip after a deep
+  // graze must not eat the quick window or the heat), and cool the heat one
+  // notch per revolution camped — hesitation visibly drains the multiplier.
+  const revsBefore = state.revolutions;
   state.revolutions += (baseSpeed * dt) / (Math.PI * 2);
-  if (state.revolutions >= COMBO_WINDOW_REVOLUTIONS && state.comboLinks > 0) {
-    state.comboLinks = 0;
+  if (
+    state.heat > 0 &&
+    Math.floor(state.revolutions / HEAT_COOL_REVOLUTIONS) >
+      Math.floor(revsBefore / HEAT_COOL_REVOLUTIONS)
+  ) {
+    state.heat -= 1;
   }
   state.ballPos = pointOnCircle(planet.center, state.orbitRadius, state.angle);
 }
@@ -217,17 +216,19 @@ function capture(state: GameState, planet: Planet, point: Vec2, approachDistance
 
   // Progression: planet ids are chain ordinals, so planetsPassed tracks
   // *altitude* — a jump that skips planets advances difficulty and zones by
-  // the full distance, and pays SKIP_POINTS per planet skipped. Capturing at
-  // or below the high-water mark (jumping backward, re-grabbing the start
-  // planet) is a safety net worth zero points — otherwise bouncing between
-  // two planets would farm score forever.
+  // the full distance. Capturing at or below the high-water mark (jumping
+  // backward, re-grabbing the start planet) is a safety net worth zero
+  // points — otherwise bouncing between two planets would farm score.
+  //
+  // Points: flat bonuses, all multiplied by the heat the flight built
+  // (flybys already ticked state.heat up mid-flight, so the skip jump
+  // itself cashes in immediately).
   if (planet.id > state.planetsPassed) {
-    const skipped = planet.id - state.planetsPassed - 1;
     state.planetsPassed = planet.id;
-    state.score +=
-      CAPTURE_POINTS * comboMultiplier(state.comboLinks) +
-      (kind === 2 ? PERFECT_POINTS : kind === 1 ? GRAZE_POINTS : 0) +
-      skipped * SKIP_POINTS;
+    const bonuses =
+      (state.releasedQuick ? QUICK_POINTS : 0) +
+      (kind === 2 ? PERFECT_POINTS : kind === 1 ? GRAZE_POINTS : 0);
+    state.score += (CAPTURE_POINTS + bonuses) * (1 + state.heat);
     const zone = zoneIndexOf(state.planetsPassed);
     if (zone !== state.zoneIndex) {
       state.zoneIndex = zone;
@@ -290,6 +291,26 @@ function stepFlight(state: GameState, dt: number): void {
 
   if (event === null) {
     state.ballPos = to;
+    // Flybys: a planet is "flown past" once the ball clears the top of its
+    // capture ring — beyond that a straight flight can never be captured by
+    // it, so this can't fire for the planet we end up landing on. Each new
+    // clear ticks the heat up (the score multiplier AND the comet glow).
+    let cleared = 0;
+    for (let i = 0; i < state.planets.length; i++) {
+      const p = state.planets[i];
+      if (
+        p.id > state.planetsPassed &&
+        p.id !== state.departedPlanetId &&
+        to.y < p.center.y - p.ringRadius
+      ) {
+        cleared += 1;
+      }
+    }
+    if (cleared > state.flightSkips) {
+      state.heat = Math.min(state.heat + (cleared - state.flightSkips), HEAT_MAX);
+      state.flightSkips = cleared;
+      state.lastFlybyAt = state.time;
+    }
     // Bounds move with the camera. Generous headroom above (camera catches
     // up); tight below and to the sides.
     const m = OFFSCREEN_MARGIN;

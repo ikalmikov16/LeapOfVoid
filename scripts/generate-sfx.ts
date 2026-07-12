@@ -117,6 +117,13 @@ writeWav('perfect.wav', mix(
   delayed(tone({ duration: 0.32, freqFrom: 990, decay: 9, volume: 0.3 }), 0.07),
 ));
 
+// Flyby: airy tick — one per planet passed mid-jump; pitch rises with heat
+// at runtime via playbackRate.
+writeWav('flyby.wav', mix(
+  tone({ duration: 0.07, freqFrom: 1150, freqTo: 1350, decay: 40, volume: 0.22 }),
+  noise(0.05, 60, 0.12),
+));
+
 // Death: low boom + impact noise.
 writeWav('death.wav', mix(
   tone({ duration: 0.5, freqFrom: 150, freqTo: 38, decay: 7, volume: 0.7 }),

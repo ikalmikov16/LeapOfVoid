@@ -1,11 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 import {
   BALL_RADIUS,
-  COMBO_MULTIPLIER_CAP,
   GRACE_AFTER_CAPTURE_S,
   GRAZE_POINTS,
+  HEAT_MAX,
   PERFECT_POINTS,
-  SKIP_POINTS,
+  QUICK_POINTS,
 } from './constants';
 import { orbitDecayRate } from './difficulty';
 import { createInitialState, handleTap, stepGame } from './engine';
@@ -45,7 +45,9 @@ function makeState(planets: Planet[], overrides: Partial<GameState>): GameState 
     velocity: { x: 0, y: 0 },
     planetsPassed: 0,
     score: 0,
-    comboLinks: 0,
+    heat: 0,
+    flightSkips: 0,
+    releasedQuick: false,
     revolutions: 0,
     zoneIndex: 0,
     time: 0,
@@ -53,6 +55,7 @@ function makeState(planets: Planet[], overrides: Partial<GameState>): GameState 
     deathCause: null,
     lastReleaseAt: -99,
     lastCaptureAt: -99,
+    lastFlybyAt: -99,
     captureKind: 0,
     capturePos: { x: 0, y: 0 },
     zoneChangedAt: -99,
@@ -201,57 +204,70 @@ describe('flight resolution', () => {
 });
 
 describe('scoring', () => {
-  test('quick release increments the streak and stamps the event', () => {
+  test('quick release sets the quick flag and stamps the event', () => {
     const s = makeState([planet], {
       phase: 'orbiting',
       currentPlanetId: 1,
       orbitRadius: planet.ringRadius,
       revolutions: 0.2,
-      comboLinks: 2,
       time: 4,
       ballPos: { x: 250, y: 400 },
     });
     const released = handleTap(s);
-    expect(released.comboLinks).toBe(3);
+    expect(released.releasedQuick).toBe(true);
     expect(released.lastReleaseAt).toBe(4);
   });
 
-  test('streak dies the moment the combo window closes, while still orbiting', () => {
+  test('slow release does not earn the quick flag', () => {
     const s = makeState([planet], {
       phase: 'orbiting',
       currentPlanetId: 1,
       orbitRadius: planet.ringRadius,
-      comboLinks: 3,
+      revolutions: 0.9,
       ballPos: { x: 250, y: 400 },
     });
-    // 0.75 revolutions at 2.3 rad/s ≈ 2.05s.
-    for (let i = 0; i < 100; i++) stepGame(s, DT); // 1.67s — window still open
-    expect(s.comboLinks).toBe(3);
-    for (let i = 0; i < 40; i++) stepGame(s, DT); // 2.33s — window closed
-    expect(s.phase).toBe('orbiting');
-    expect(s.comboLinks).toBe(0);
+    expect(handleTap(s).releasedQuick).toBe(false);
   });
 
-  test('capture scores capture points times the multiplier', () => {
+  test('quick bonus is flat and multiplied by heat', () => {
     const s = makeState([planet], {
       ballPos: { x: 0, y: 440 },
       velocity: { x: 520, y: 0 },
-      comboLinks: 3,
+      releasedQuick: true,
+      heat: 2,
     });
     runUntilSettled(s);
     expect(s.phase).toBe('orbiting');
-    expect(s.score).toBe(4); // 1 × ×4 (first quick hop is already ×2)
+    expect(s.score).toBe((1 + QUICK_POINTS) * 3); // (capture + quick) × (1 + heat)
     expect(s.planetsPassed).toBe(1);
   });
 
-  test('multiplier is capped', () => {
+  test('heat multiplier tops out at ×(1 + HEAT_MAX)', () => {
     const s = makeState([planet], {
       ballPos: { x: 0, y: 440 },
       velocity: { x: 520, y: 0 },
-      comboLinks: 99,
+      heat: HEAT_MAX,
     });
     runUntilSettled(s);
-    expect(s.score).toBe(COMBO_MULTIPLIER_CAP);
+    expect(s.score).toBe(1 + HEAT_MAX);
+  });
+
+  test('camping cools the heat one notch per revolution', () => {
+    const s = makeState([planet], {
+      phase: 'orbiting',
+      currentPlanetId: 1,
+      orbitRadius: planet.ringRadius,
+      heat: 3,
+      ballPos: { x: 250, y: 400 },
+    });
+    // One revolution at 2.3 rad/s ≈ 2.73s ≈ 164 frames.
+    for (let i = 0; i < 160; i++) stepGame(s, DT);
+    expect(s.heat).toBe(3); // still inside the first revolution
+    for (let i = 0; i < 10; i++) stepGame(s, DT);
+    expect(s.heat).toBe(2); // crossed 1 revolution
+    for (let i = 0; i < 170; i++) stepGame(s, DT);
+    expect(s.heat).toBe(1); // crossed 2 revolutions
+    expect(s.phase).toBe('orbiting');
   });
 
   test('skimming the surface earns the graze bonus', () => {
@@ -272,13 +288,52 @@ describe('scoring', () => {
     expect(s.score).toBe(1 + PERFECT_POINTS);
   });
 
-  test('skipping planets pays skip points and advances difficulty to the id', () => {
-    const far: Planet = { ...planet, id: 4 };
-    const s = makeState([far], { ballPos: { x: 0, y: 440 }, velocity: { x: 520, y: 0 } });
+  test('flybys tick heat mid-flight and the capture cashes in the multiplier', () => {
+    // Vertical flight up x=200 past two planets 100px to either side (outside
+    // their rings), into a capture on the third (40px off-path = in-band).
+    const passedA: Planet = { id: 1, center: { x: 100, y: 600 }, radius: 20, ringRadius: 50, color: '#fff' };
+    const passedB: Planet = { id: 2, center: { x: 300, y: 400 }, radius: 20, ringRadius: 50, color: '#fff' };
+    const target: Planet = { id: 3, center: { x: 240, y: 100 }, radius: 20, ringRadius: 50, color: '#fff' };
+    const s = makeState([passedA, passedB, target], {
+      ballPos: { x: 200, y: 800 },
+      velocity: { x: 0, y: -520 },
+    });
+
+    // First flyby: ball clears A's ring top (y < 550) at ~0.48s.
+    for (let i = 0; i < 40; i++) stepGame(s, DT);
+    expect(s.phase).toBe('flying');
+    expect(s.heat).toBe(1);
+    expect(s.flightSkips).toBe(1);
+    expect(s.lastFlybyAt).toBeGreaterThan(0);
+
+    // Second flyby: clears B's ring top (y < 350) at ~0.87s.
+    for (let i = 0; i < 25; i++) stepGame(s, DT);
+    expect(s.heat).toBe(2);
+
     runUntilSettled(s);
     expect(s.phase).toBe('orbiting');
-    expect(s.planetsPassed).toBe(4); // altitude, not capture count
-    expect(s.score).toBe(1 + 3 * SKIP_POINTS); // capture ×1 + 3 skipped
+    expect(s.currentPlanetId).toBe(3);
+    expect(s.heat).toBe(2); // the captured planet itself never ticks
+    expect(s.planetsPassed).toBe(3); // altitude, not capture count
+    expect(s.score).toBe(1 * 3); // capture × (1 + heat)
+  });
+
+  test('heat from flybys is capped at HEAT_MAX', () => {
+    // A tall stack of side planets, all cleared in one flight.
+    const stack: Planet[] = [1, 2, 3, 4, 5, 6].map((id) => ({
+      id,
+      center: { x: 60, y: 700 - id * 90 },
+      radius: 15,
+      ringRadius: 35,
+      color: '#fff',
+    }));
+    const s = makeState(stack, {
+      ballPos: { x: 300, y: 800 },
+      velocity: { x: 0, y: -520 },
+    });
+    for (let i = 0; i < 120 && s.phase === 'flying'; i++) stepGame(s, DT);
+    expect(s.heat).toBe(HEAT_MAX);
+    expect(s.flightSkips).toBe(6);
   });
 
   test('capturing at or below the high-water mark scores nothing (no farming)', () => {
@@ -292,6 +347,7 @@ describe('scoring', () => {
     expect(s.currentPlanetId).toBe(1);
     expect(s.planetsPassed).toBe(5); // ...but no progress
     expect(s.score).toBe(0); // ...and no points
+    expect(s.heat).toBe(0); // ...and no heat from below the high-water mark
   });
 
   test('crossing a zone boundary stamps the zone change', () => {

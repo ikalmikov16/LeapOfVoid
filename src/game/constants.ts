@@ -25,15 +25,20 @@ export const AIM_LINE_LENGTH = 85;
 export const AIM_LINE_OPACITY = 0.5;
 
 // --- Scoring (score = points; planetsPassed drives difficulty) ---
+// Per capture: (CAPTURE + flat bonuses) × (1 + heat). Heat — built by flying
+// past planets mid-jump, cooled by camping — is the one multiplier.
 
 export const CAPTURE_POINTS = 1;
-export const GRAZE_POINTS = 2;
-export const PERFECT_POINTS = 3;
-/** Points per planet skipped in a single jump (on top of capture points). */
-export const SKIP_POINTS = 2;
-/** Release within this fraction of a revolution to keep the streak alive. */
-export const COMBO_WINDOW_REVOLUTIONS = 0.75;
-export const COMBO_MULTIPLIER_CAP = 5;
+export const GRAZE_POINTS = 1;
+export const PERFECT_POINTS = 2;
+/** Flat bonus for releasing within the quick window. */
+export const QUICK_POINTS = 1;
+/** Release within this fraction of a revolution to earn the quick bonus. */
+export const QUICK_WINDOW_REVOLUTIONS = 0.75;
+/** Heat cap: +1 per planet flown past, so the multiplier tops out at ×5. */
+export const HEAT_MAX = 4;
+/** Camping cools: lose 1 heat per this many revolutions orbited. */
+export const HEAT_COOL_REVOLUTIONS = 1;
 /** Closest approach within this of the surface = graze (nearly died). */
 export const GRAZE_MARGIN = 8;
 /** Middle fraction of the capture band that counts as a perfect capture. */
@@ -165,6 +170,8 @@ export const FLASH_DURATION_S = 0.22;
 export const SHAKE_DURATION_S = 0.45;
 export const SHAKE_AMPLITUDE = 9;
 export const PERFECT_PULSE_S = 0.5;
+/** Ball glow pop when a flyby ticks the heat up. */
+export const FLYBY_PULSE_S = 0.3;
 /** Background gradient cross-fade time on zone change. */
 export const ZONE_FADE_S = 1.5;
 /** How long the zone name flashes in the HUD (JS side). */
@@ -191,3 +198,15 @@ export const COLORS = {
   starDim: '#8489B8',
   starBright: '#C9D1F5',
 } as const;
+
+/**
+ * Ball glow / trail / HUD badge color per heat level (0..HEAT_MAX).
+ * The comet look IS the multiplier gauge: cyan cold → red-hot ×5.
+ */
+export const HEAT_COLORS: readonly string[] = [
+  '#7DF9FF', // 0 — cold (matches ballGlow)
+  '#FFE29A', // 1 — pale gold
+  '#FFB86B', // 2 — orange
+  '#FF8A50', // 3 — deep orange
+  '#FF5C3A', // 4 — red-hot
+];

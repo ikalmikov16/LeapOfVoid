@@ -13,7 +13,8 @@ import {
   BURST_DURATION_S,
   BURST_PARTICLES,
   BURST_SPEED,
-  COLORS,
+  HEAT_COLORS,
+  HEAT_MAX,
   PERFECT_PULSE_S,
   SHATTER_DURATION_S,
   SHATTER_PARTICLES,
@@ -199,18 +200,19 @@ function TrailDot({ i, gameState }: { i: number; gameState: SharedValue<GameStat
   const opacity = useDerivedValue(() => {
     const s = gameState.value;
     if (s.phase === 'dead') return 0;
-    // Trail heat is the combo telegraph: faint by default, blazing on a streak.
-    const heat = 0.25 + 0.75 * Math.min(s.comboLinks / 4, 1);
-    return 0.55 * fade * heat;
+    // Trail intensity telegraphs heat: faint when cold, blazing at ×5.
+    const glow = 0.25 + 0.75 * Math.min(s.heat / HEAT_MAX, 1);
+    return 0.55 * fade * glow;
   });
+  const color = useDerivedValue(() => HEAT_COLORS[gameState.value.heat]);
   return (
-    <Circle cx={cx} cy={cy} r={BALL_RADIUS * (0.2 + 0.6 * fade)} opacity={opacity} color={COLORS.ballGlow} />
+    <Circle cx={cx} cy={cy} r={BALL_RADIUS * (0.2 + 0.6 * fade)} opacity={opacity} color={color} />
   );
 }
 
 const TRAIL_IDX = Array.from({ length: TRAIL_COUNT }, (_, i) => i);
 
-/** Comet trail behind the ball; intensity scales with the combo streak. */
+/** Comet trail behind the ball; color and intensity scale with heat. */
 export function Trail({ gameState }: { gameState: SharedValue<GameState> }) {
   return (
     <>
