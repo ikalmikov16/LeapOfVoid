@@ -36,5 +36,5 @@ Track milestone progress here as milestones complete:
 - [x] M1: Core loop prototype (static planet chain, orbit, tap-release, capture/crash/miss, death, restart, score) — feel validated on device
 - [x] M2: Procedural generation, camera follow, difficulty dials, orbit decay — implemented; difficulty numbers still being tuned on device
 - [x] M3: Juice pass (trail, particles, shake, haptics, SFX, combo/graze/perfect, zones, aim line, crash restored) — implemented; feel/SFX tuning pending device playtest
-- [ ] M4: Meta screens (home, death card, settings, best-score persistence)
+- [x] M4: Meta screens (home, death card w/ share + NEW BEST, settings toggles, best-score persistence) — implemented; on-device verification pending
 - [ ] M5: Ship (icon, branding, EAS build, TestFlight, App Store)

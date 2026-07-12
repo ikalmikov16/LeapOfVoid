@@ -3,12 +3,19 @@
 
 import * as Haptics from 'expo-haptics';
 import type { CaptureKind } from '../game/types';
+import { useAppStore } from '../state/appStore';
+
+function enabled(): boolean {
+  return useAppStore.getState().hapticsEnabled;
+}
 
 export function hapticRelease(): void {
+  if (!enabled()) return;
   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 }
 
 export function hapticCapture(kind: CaptureKind): void {
+  if (!enabled()) return;
   if (kind === 2) {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   } else if (kind === 1) {
@@ -19,9 +26,11 @@ export function hapticCapture(kind: CaptureKind): void {
 }
 
 export function hapticDeath(): void {
+  if (!enabled()) return;
   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
 }
 
 export function hapticZone(): void {
+  if (!enabled()) return;
   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
 }

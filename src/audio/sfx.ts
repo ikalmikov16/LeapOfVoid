@@ -3,6 +3,7 @@
 
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 import type { CaptureKind } from '../game/types';
+import { useAppStore } from '../state/appStore';
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 const players = {
@@ -20,6 +21,7 @@ export async function initAudio(): Promise<void> {
 }
 
 function replay(player: AudioPlayer): void {
+  if (!useAppStore.getState().soundEnabled) return;
   player.seekTo(0);
   player.play();
 }

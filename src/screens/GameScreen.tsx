@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, Share, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   FadeIn,
@@ -9,13 +9,14 @@ import Animated, {
   useFrameCallback,
   useSharedValue,
 } from 'react-native-reanimated';
-import { initAudio, sfxCapture, sfxDeath, sfxRelease, sfxZone } from '../audio/sfx';
+import { sfxCapture, sfxDeath, sfxRelease, sfxZone } from '../audio/sfx';
 import { hapticCapture, hapticDeath, hapticRelease, hapticZone } from '../effects/haptics';
 import { DEATH_OVERLAY_DELAY_MS, MAX_FRAME_DT_S, ZONE_FLASH_MS } from '../game/constants';
 import { comboMultiplier, createInitialState, handleTap, stepGame } from '../game/engine';
 import type { CaptureKind, DeathCause, GameState, Phase, Planet } from '../game/types';
 import { GameCanvas } from '../rendering/GameCanvas';
 import { zonePalette } from '../rendering/zones';
+import { useAppStore } from '../state/appStore';
 
 const DEATH_MESSAGES: Record<DeathCause, string> = {
   crash: 'SMACKED THE SURFACE',
@@ -33,13 +34,15 @@ export function GameScreen() {
   const [uiCombo, setUiCombo] = useState(0);
   const [uiPhase, setUiPhase] = useState<Phase>('orbiting');
   const [uiDeathCause, setUiDeathCause] = useState<DeathCause | null>(null);
+  const [isNewBest, setIsNewBest] = useState(false);
   const [zoneFlash, setZoneFlash] = useState<string | null>(null);
   const zoneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Planet window changes on generation/prune (a few times per capture at most).
   const [planets, setPlanets] = useState<Planet[]>(initialState.planets);
 
+  const bestScore = useAppStore((s) => s.bestScore);
+
   useEffect(() => {
-    initAudio();
     return () => {
       if (zoneTimer.current !== null) clearTimeout(zoneTimer.current);
     };
@@ -62,9 +65,10 @@ export function GameScreen() {
     sfxCapture(kind, comboLinks);
     hapticCapture(kind);
   };
-  const onDeath = () => {
+  const onDeath = (score: number) => {
     sfxDeath();
     hapticDeath();
+    setIsNewBest(useAppStore.getState().submitScore(score));
   };
   const onZone = (zoneIndex: number) => {
     sfxZone();
@@ -74,10 +78,28 @@ export function GameScreen() {
     zoneTimer.current = setTimeout(() => setZoneFlash(null), ZONE_FLASH_MS);
   };
 
-  const tap = Gesture.Tap().onBegin(() => {
-    // onBegin fires on touch-down (not release) — lowest possible input latency.
+  // While dead, input belongs to the death card (tap-to-retry surface +
+  // share/home buttons); the global gesture would race the buttons.
+  const tap = Gesture.Tap()
+    .enabled(uiPhase !== 'dead')
+    .onBegin(() => {
+      // onBegin fires on touch-down (not release) — lowest possible input latency.
+      gameState.value = { ...handleTap({ ...gameState.value }) };
+    });
+
+  // Worklets are plain functions on the JS thread, so the death card can
+  // drive the same tap logic (restart cooldown included) from a Pressable.
+  const restartRun = () => {
     gameState.value = { ...handleTap({ ...gameState.value }) };
-  });
+  };
+  const shareScore = () => {
+    Share.share({
+      message: `I scored ${uiScore} in Leap of Void — can you beat it? #leapofvoid`,
+    }).catch(() => {});
+  };
+  const goHome = () => {
+    useAppStore.getState().setScreen('home');
+  };
 
   useAnimatedReaction(
     () => gameState.value.score,
@@ -98,7 +120,7 @@ export function GameScreen() {
         runOnJS(setUiPhase)(phase);
         if (phase === 'dead') {
           runOnJS(setUiDeathCause)(gameState.value.deathCause);
-          if (prev !== null) runOnJS(onDeath)();
+          if (prev !== null) runOnJS(onDeath)(gameState.value.score);
         }
       }
     },
@@ -164,13 +186,29 @@ export function GameScreen() {
             entering={FadeIn.delay(DEATH_OVERLAY_DELAY_MS).duration(300)}
             exiting={FadeOut.duration(120)}
             style={styles.deathOverlay}
-            pointerEvents="none"
           >
-            <Text style={styles.deathCause}>
-              {uiDeathCause !== null ? DEATH_MESSAGES[uiDeathCause] : ''}
-            </Text>
-            <Text style={styles.deathScore}>{uiScore}</Text>
-            <Text style={styles.retry}>tap to try again</Text>
+            <Pressable style={styles.deathTapArea} onPress={restartRun}>
+              <Text style={styles.deathCause}>
+                {uiDeathCause !== null ? DEATH_MESSAGES[uiDeathCause] : ''}
+              </Text>
+              <Text style={styles.deathScore}>{uiScore}</Text>
+              {isNewBest ? (
+                <Text style={styles.newBest}>NEW BEST</Text>
+              ) : (
+                <Text style={styles.bestLine}>BEST {bestScore}</Text>
+              )}
+              {/* Reserved for the post-launch rewarded "continue" button. */}
+              <View style={styles.continueSlot} />
+              <Text style={styles.retry}>tap to try again</Text>
+              <View style={styles.deathButtons}>
+                <Pressable style={styles.deathButton} onPress={shareScore} hitSlop={8}>
+                  <Text style={styles.deathButtonText}>SHARE</Text>
+                </Pressable>
+                <Pressable style={styles.deathButton} onPress={goHome} hitSlop={8}>
+                  <Text style={styles.deathButtonText}>HOME</Text>
+                </Pressable>
+              </View>
+            </Pressable>
           </Animated.View>
         )}
       </View>
@@ -236,6 +274,9 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: 'rgba(4,4,16,0.82)',
+  },
+  deathTapArea: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -252,9 +293,43 @@ const styles = StyleSheet.create({
     marginVertical: 12,
     fontVariant: ['tabular-nums'],
   },
+  newBest: {
+    color: '#F9C80E',
+    fontSize: 17,
+    fontWeight: '900',
+    letterSpacing: 5,
+  },
+  bestLine: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: 3,
+    fontVariant: ['tabular-nums'],
+  },
+  continueSlot: {
+    height: 56,
+  },
   retry: {
     color: 'rgba(255,255,255,0.45)',
     fontSize: 15,
+    letterSpacing: 2,
+  },
+  deathButtons: {
+    flexDirection: 'row',
+    gap: 14,
+    marginTop: 32,
+  },
+  deathButton: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.28)',
+    borderRadius: 22,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+  },
+  deathButtonText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 13,
+    fontWeight: '700',
     letterSpacing: 2,
   },
 });

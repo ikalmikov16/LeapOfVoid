@@ -1,6 +1,6 @@
 # M4 — Meta: Home Screen, Death Card, Settings, Best-Score Persistence
 
-**Status: Draft** (awaiting sign-off)
+**Status: Done** (implemented; persistence/share/toggles need an on-device check)
 
 ## 1. Goal
 
