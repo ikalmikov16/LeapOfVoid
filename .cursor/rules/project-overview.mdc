@@ -34,7 +34,7 @@ but no ad SDK in v1.
 Track milestone progress here as milestones complete:
 
 - [x] M1: Core loop prototype (static planet chain, orbit, tap-release, capture/crash/miss, death, restart, score) — feel validated on device
-- [ ] M2: Procedural generation, camera follow, difficulty dials, orbit decay
+- [x] M2: Procedural generation, camera follow, difficulty dials, orbit decay — implemented; difficulty numbers still being tuned on device
 - [ ] M3: Juice pass (trail, particles, shake, haptics, SFX, combo/graze/perfect, zones)
 - [ ] M4: Meta screens (home, death card, settings, best-score persistence)
 - [ ] M5: Ship (icon, branding, EAS build, TestFlight, App Store)

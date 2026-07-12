@@ -11,48 +11,69 @@
 // (never mutate nested objects), so the previous state object is never touched.
 
 import {
+  BALL_RADIUS,
+  CAMERA_BALL_ANCHOR,
+  CAMERA_PLANET_ANCHOR,
+  CAMERA_SMOOTHING,
   FLIGHT_SPEED,
+  GRACE_AFTER_CAPTURE_S,
   OFFSCREEN_MARGIN,
-  ORBIT_ANGULAR_SPEED,
+  OFFSCREEN_TOP_SCREENS,
   PLANET_COLORS,
-  PLANET_LAYOUT,
   RESTART_COOLDOWN_S,
 } from './constants';
+import { captureBandWidth, orbitAngularSpeed, orbitDecayRate, planetRadius } from './difficulty';
+import { updatePlanetWindow } from './generation';
 import { closestApproachOnSegment, pointOnCircle, segmentCircleEntry } from './geometry';
+import { rand01 } from './rng';
 import type { GameState, Planet, Vec2 } from './types';
 
-export function createLevel(width: number, height: number): Planet[] {
+export function findPlanet(planets: Planet[], id: number): Planet | null {
   'worklet';
-  return PLANET_LAYOUT.map((p, i) => ({
-    id: i,
-    center: { x: p.fx * width, y: p.fy * height },
-    radius: p.radius,
-    ringRadius: p.ring,
-    color: PLANET_COLORS[i % PLANET_COLORS.length],
-  }));
+  for (let i = 0; i < planets.length; i++) {
+    if (planets[i].id === id) return planets[i];
+  }
+  return null;
 }
 
-export function createInitialState(width: number, height: number): GameState {
+export function createInitialState(width: number, height: number, seed?: number): GameState {
   'worklet';
-  const planets = createLevel(width, height);
-  const start = planets[0];
-  const angle = Math.PI / 2;
-  return {
+  const state: GameState = {
     phase: 'orbiting',
-    planets,
+    planets: [],
     width,
     height,
-    currentPlanetIndex: 0,
-    departedPlanetIndex: -1,
-    angle,
+    cameraY: -height * CAMERA_PLANET_ANCHOR,
+    currentPlanetId: 0,
+    departedPlanetId: -1,
+    angle: Math.PI / 2,
     direction: 1,
-    ballPos: pointOnCircle(start.center, start.ringRadius, angle),
+    orbitRadius: 0,
+    graceUntil: 0,
+    ballPos: { x: 0, y: 0 },
     velocity: { x: 0, y: 0 },
     score: 0,
     time: 0,
     deathTime: 0,
     deathCause: null,
+    rngState: seed !== undefined ? seed | 0 : Math.floor(Math.random() * 4294967296) | 0,
+    nextPlanetId: 1,
   };
+  // First planet at the world origin, centered; the camera anchors it at
+  // CAMERA_PLANET_ANCHOR down the screen. The window fills the rest upward.
+  const startRadius = planetRadius(0, rand01(state));
+  const start: Planet = {
+    id: 0,
+    center: { x: width * 0.5, y: 0 },
+    radius: startRadius,
+    ringRadius: startRadius + captureBandWidth(0),
+    color: PLANET_COLORS[0],
+  };
+  state.planets = [start];
+  state.orbitRadius = start.ringRadius;
+  state.ballPos = pointOnCircle(start.center, start.ringRadius, state.angle);
+  updatePlanetWindow(state);
+  return state;
 }
 
 function release(state: GameState): void {
@@ -62,43 +83,58 @@ function release(state: GameState): void {
     x: -Math.sin(state.angle) * state.direction * FLIGHT_SPEED,
     y: Math.cos(state.angle) * state.direction * FLIGHT_SPEED,
   };
-  state.departedPlanetIndex = state.currentPlanetIndex;
+  state.departedPlanetId = state.currentPlanetId;
   state.phase = 'flying';
 }
 
-function stepOrbit(state: GameState, dt: number): void {
-  'worklet';
-  const planet = state.planets[state.currentPlanetIndex];
-  state.angle += state.direction * ORBIT_ANGULAR_SPEED * dt;
-  state.ballPos = pointOnCircle(planet.center, planet.ringRadius, state.angle);
-}
-
-function die(state: GameState, cause: 'crash' | 'lost'): void {
+function die(state: GameState, cause: 'crash' | 'lost' | 'burned'): void {
   'worklet';
   state.phase = 'dead';
   state.deathCause = cause;
   state.deathTime = state.time;
 }
 
-function capture(state: GameState, planetIndex: number, point: Vec2): void {
+function stepOrbit(state: GameState, dt: number): void {
   'worklet';
-  const planet = state.planets[planetIndex];
+  const planet = findPlanet(state.planets, state.currentPlanetId);
+  if (planet === null) return;
+  // Decay: the orbit spirals inward once past the grace window; reaching the
+  // surface is the anti-camping death.
+  if (state.time >= state.graceUntil) {
+    const rate = orbitDecayRate(state.score);
+    if (rate > 0) {
+      state.orbitRadius -= rate * dt;
+      if (state.orbitRadius <= planet.radius + BALL_RADIUS) {
+        state.ballPos = pointOnCircle(planet.center, planet.radius + BALL_RADIUS, state.angle);
+        die(state, 'burned');
+        return;
+      }
+    }
+  }
+  state.angle += state.direction * orbitAngularSpeed(state.score) * dt;
+  state.ballPos = pointOnCircle(planet.center, state.orbitRadius, state.angle);
+}
+
+function capture(state: GameState, planet: Planet, point: Vec2): void {
+  'worklet';
   const radial = { x: point.x - planet.center.x, y: point.y - planet.center.y };
   // Orbit direction follows the approach direction so the flow feels continuous.
   const cross = radial.x * state.velocity.y - radial.y * state.velocity.x;
   state.direction = cross >= 0 ? 1 : -1;
   state.angle = Math.atan2(radial.y, radial.x);
-  state.currentPlanetIndex = planetIndex;
-  state.departedPlanetIndex = -1;
-  // v1 rule: snap to the planet's fixed ring.
+  state.currentPlanetId = planet.id;
+  state.departedPlanetId = -1;
+  // v1 rule: snap to the planet's fixed ring; decay then works inward from it.
+  state.orbitRadius = planet.ringRadius;
+  state.graceUntil = state.time + GRACE_AFTER_CAPTURE_S;
   state.ballPos = pointOnCircle(planet.center, planet.ringRadius, state.angle);
   state.phase = 'orbiting';
   state.score += 1;
 }
 
 type FlightEvent =
-  | { kind: 'crash'; t: number; planetIndex: number }
-  | { kind: 'capture'; t: number; planetIndex: number; point: Vec2 };
+  | { kind: 'crash'; t: number; planet: Planet }
+  | { kind: 'capture'; t: number; planet: Planet; point: Vec2 };
 
 function stepFlight(state: GameState, dt: number): void {
   'worklet';
@@ -111,14 +147,14 @@ function stepFlight(state: GameState, dt: number): void {
   // Earliest event along this frame's segment wins.
   let event: FlightEvent | null = null;
   for (let i = 0; i < state.planets.length; i++) {
-    if (i === state.departedPlanetIndex) continue;
     const planet = state.planets[i];
+    if (planet.id === state.departedPlanetId) continue;
 
     // Closest approach inside the body = crash (checked as circle entry so the
     // ball dies at the surface, not past it).
     const entryT = segmentCircleEntry(from, to, planet.center, planet.radius);
     if (entryT !== null && (event === null || entryT < event.t)) {
-      event = { kind: 'crash', t: entryT, planetIndex: i };
+      event = { kind: 'crash', t: entryT, planet };
     }
 
     // Capture: the path's closest approach falls inside the capture band.
@@ -131,14 +167,18 @@ function stepFlight(state: GameState, dt: number): void {
       approach.distance <= planet.ringRadius &&
       (event === null || approach.t < event.t)
     ) {
-      event = { kind: 'capture', t: approach.t, planetIndex: i, point: approach.point };
+      event = { kind: 'capture', t: approach.t, planet, point: approach.point };
     }
   }
 
   if (event === null) {
     state.ballPos = to;
+    // Bounds move with the camera. Generous headroom above (camera catches
+    // up); tight below and to the sides.
     const m = OFFSCREEN_MARGIN;
-    if (to.x < -m || to.x > state.width + m || to.y < -m || to.y > state.height + m) {
+    const topBound = state.cameraY - state.height * OFFSCREEN_TOP_SCREENS;
+    const bottomBound = state.cameraY + state.height + m;
+    if (to.x < -m || to.x > state.width + m || to.y > bottomBound || to.y < topBound) {
       die(state, 'lost');
     }
     return;
@@ -153,7 +193,24 @@ function stepFlight(state: GameState, dt: number): void {
     return;
   }
 
-  capture(state, event.planetIndex, event.point);
+  capture(state, event.planet, event.point);
+}
+
+function stepCamera(state: GameState, dt: number): void {
+  'worklet';
+  let target: number;
+  if (state.phase === 'flying') {
+    target = state.ballPos.y - state.height * CAMERA_BALL_ANCHOR;
+  } else {
+    const planet = findPlanet(state.planets, state.currentPlanetId);
+    if (planet === null) return;
+    target = planet.center.y - state.height * CAMERA_PLANET_ANCHOR;
+  }
+  // The camera only climbs (world y decreases). Downward flights fall out of
+  // the viewport and die instead of dragging the camera back down.
+  if (target < state.cameraY) {
+    state.cameraY += (target - state.cameraY) * Math.min(1, CAMERA_SMOOTHING * dt);
+  }
 }
 
 /** Single tap: release while orbiting, restart when dead, no-op in flight. */
@@ -174,4 +231,8 @@ export function stepGame(state: GameState, dt: number): void {
   state.time += dt;
   if (state.phase === 'orbiting') stepOrbit(state, dt);
   else if (state.phase === 'flying') stepFlight(state, dt);
+  if (state.phase !== 'dead') {
+    stepCamera(state, dt);
+    updatePlanetWindow(state);
+  }
 }

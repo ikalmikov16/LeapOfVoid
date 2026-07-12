@@ -1,6 +1,6 @@
 # M2 — Procedural Generation, Camera Follow, Difficulty, Orbit Decay
 
-**Status: Draft** (awaiting sign-off)
+**Status: Done** (implemented + unit-tested; difficulty numbers await on-device tuning)
 
 ## 1. Goal
 
@@ -42,6 +42,9 @@ everything after this is presentation (M3) and packaging (M4/M5).
   `cameraY += (target - cameraY) * min(1, CAMERA_SMOOTHING * dt)`.
 - **Camera target:** while orbiting, frame the current planet at ~65% screen
   height; while flying, track the ball so long shots stay visible.
+  *(Implementation note: the camera only ever climbs — a downward shot never
+  drags it back down, it just falls out of the viewport and dies. This keeps
+  the lost-in-space check meaningful and the framing monotonic.)*
 - **Death bounds move with the camera:** the ball is lost when it leaves the
   camera viewport by `OFFSCREEN_MARGIN` horizontally or vertically (replaces
   M1's static-screen check). Shooting downward/backward is thus fatal quickly,
@@ -88,7 +91,7 @@ everything after this is presentation (M3) and packaging (M4/M5).
 - Capture snaps the ball to `ringRadius` (unchanged v1 rule); a new
   `orbitRadius` field on `GameState` then shrinks at `decayRate(n)` px/s.
 - **Burn-up:** `orbitRadius <= planet.radius + BALL_RADIUS` → death, new
-  cause `'burned'` ("BURNED UP ON APPROACH" on the death overlay).
+  cause `'burned'` ("BURNED UP IN ORBIT" on the death overlay).
 - Release velocity magnitude stays `FLIGHT_SPEED` regardless of radius;
   release direction uses the tangent at the decayed radius. Capture geometry
   of *other* planets is untouched (band stays `[radius, ringRadius]`).

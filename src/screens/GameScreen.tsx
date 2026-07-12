@@ -8,20 +8,27 @@ import {
   useSharedValue,
 } from 'react-native-reanimated';
 import { MAX_FRAME_DT_S } from '../game/constants';
-import { createInitialState, createLevel, handleTap, stepGame } from '../game/engine';
-import type { DeathCause, GameState, Phase } from '../game/types';
+import { createInitialState, handleTap, stepGame } from '../game/engine';
+import type { DeathCause, GameState, Phase, Planet } from '../game/types';
 import { GameCanvas } from '../rendering/GameCanvas';
+
+const DEATH_MESSAGES: Record<DeathCause, string> = {
+  crash: 'SMACKED THE SURFACE',
+  lost: 'LOST IN THE VOID',
+  burned: 'BURNED UP IN ORBIT',
+};
 
 export function GameScreen() {
   const { width, height } = useWindowDimensions();
-  // Static render copy of the level; deterministic, so it matches the sim's.
-  const planets = useMemo(() => createLevel(width, height), [width, height]);
-  const gameState = useSharedValue<GameState>(createInitialState(width, height));
+  const initialState = useMemo(() => createInitialState(width, height), [width, height]);
+  const gameState = useSharedValue<GameState>(initialState);
 
   // React-side mirrors, updated only on discrete events (never per frame).
   const [uiScore, setUiScore] = useState(0);
   const [uiPhase, setUiPhase] = useState<Phase>('orbiting');
   const [uiDeathCause, setUiDeathCause] = useState<DeathCause | null>(null);
+  // Planet window changes on generation/prune (a few times per capture at most).
+  const [planets, setPlanets] = useState<Planet[]>(initialState.planets);
 
   useFrameCallback((frame) => {
     const dt = Math.min((frame.timeSincePreviousFrame ?? 16.7) / 1000, MAX_FRAME_DT_S);
@@ -52,6 +59,14 @@ export function GameScreen() {
       }
     },
   );
+  // The engine replaces the array reference whenever the window changes, so
+  // reference equality is exactly "did generation or pruning happen".
+  useAnimatedReaction(
+    () => gameState.value.planets,
+    (current, prev) => {
+      if (current !== prev) runOnJS(setPlanets)(current);
+    },
+  );
 
   return (
     <GestureDetector gesture={tap}>
@@ -68,7 +83,7 @@ export function GameScreen() {
         {uiPhase === 'dead' && (
           <View style={styles.deathOverlay} pointerEvents="none">
             <Text style={styles.deathCause}>
-              {uiDeathCause === 'crash' ? 'SMACKED THE SURFACE' : 'LOST IN THE VOID'}
+              {uiDeathCause !== null ? DEATH_MESSAGES[uiDeathCause] : ''}
             </Text>
             <Text style={styles.deathScore}>{uiScore}</Text>
             <Text style={styles.retry}>tap to try again</Text>
