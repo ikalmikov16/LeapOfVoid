@@ -16,8 +16,12 @@ const players = {
 } as const;
 
 export async function initAudio(): Promise<void> {
-  // Games play sound even with the silent switch on.
-  await setAudioModeAsync({ playsInSilentMode: true });
+  await setAudioModeAsync({
+    // Games play sound even with the silent switch on.
+    playsInSilentMode: true,
+    // Short SFX must not pause the player's own music.
+    interruptionMode: 'mixWithOthers',
+  });
 }
 
 function replay(player: AudioPlayer): void {

@@ -92,11 +92,15 @@ export function GameScreen() {
   // Worklets are plain functions on the JS thread, so the death card can
   // drive the same tap logic (restart cooldown included) from a Pressable.
   const restartRun = () => {
+    // A zone banner from the previous run must not hang over the fresh one.
+    if (zoneTimer.current !== null) clearTimeout(zoneTimer.current);
+    setZoneFlash(null);
     gameState.value = { ...handleTap({ ...gameState.value }) };
   };
   const shareScore = () => {
+    const planets = `${uiPlanets} ${uiPlanets === 1 ? 'planet' : 'planets'} deep`;
     Share.share({
-      message: `I scored ${uiScore} in Leap of Void — can you beat it? #leapofvoid`,
+      message: `I scored ${uiScore} in Leap of Void — ${planets}. Can you beat it? #leapofvoid`,
     }).catch(() => {});
   };
   const goHome = () => {
