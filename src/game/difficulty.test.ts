@@ -5,12 +5,15 @@ import {
   BAND_START,
   DECAY_FREE_PLANETS,
   DECAY_MAX,
+  EARLY_RING_BOOST,
+  EARLY_RING_BOOST_PLANETS,
   FAIR_START_PLANETS,
   ORBIT_SPEED_MAX,
 } from './constants';
 import {
   captureBandWidth,
   coneHalfAngle,
+  earlyRingBoost,
   jumpMax,
   jumpMin,
   orbitAngularSpeed,
@@ -52,5 +55,14 @@ describe('difficulty dials', () => {
 
   test('deep-game band floor is reachable and respected', () => {
     expect(captureBandWidth(1000)).toBe(BAND_MIN);
+  });
+
+  test('early ring boost starts at full strength and eases to exactly 1×', () => {
+    expect(earlyRingBoost(0)).toBeCloseTo(EARLY_RING_BOOST);
+    for (let n = 0; n < 30; n++) {
+      expect(earlyRingBoost(n + 1)).toBeLessThanOrEqual(earlyRingBoost(n));
+    }
+    expect(earlyRingBoost(EARLY_RING_BOOST_PLANETS)).toBe(1);
+    expect(earlyRingBoost(1000)).toBe(1);
   });
 });

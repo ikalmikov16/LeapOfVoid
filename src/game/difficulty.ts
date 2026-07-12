@@ -8,6 +8,8 @@ import {
   BAND_START,
   BAND_ZONE_STEP,
   CONE_HALF_BASE,
+  EARLY_RING_BOOST,
+  EARLY_RING_BOOST_PLANETS,
   CONE_HALF_CAP,
   CONE_HALF_GROWTH,
   DECAY_BASE,
@@ -43,6 +45,13 @@ export function captureBandWidth(n: number): number {
   const smooth = BAND_START - BAND_SHRINK_PER_PLANET * n;
   const stepped = smooth - zoneIndex(n) * BAND_ZONE_STEP;
   return Math.max(BAND_MIN, stepped);
+}
+
+/** Early orbits run bigger on average, easing linearly back to 1×. */
+export function earlyRingBoost(n: number): number {
+  'worklet';
+  const f = Math.max(0, 1 - n / EARLY_RING_BOOST_PLANETS);
+  return 1 + (EARLY_RING_BOOST - 1) * f;
 }
 
 export function orbitAngularSpeed(n: number): number {

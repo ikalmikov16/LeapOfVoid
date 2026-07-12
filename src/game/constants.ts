@@ -21,7 +21,7 @@ export const MAX_FRAME_DT_S = 1 / 20;
 /** Gap between ball center and the start of the line. */
 export const AIM_LINE_START = 14;
 /** Length of the dashed hint — long enough to read direction, too short to solve the jump. */
-export const AIM_LINE_LENGTH = 90;
+export const AIM_LINE_LENGTH = 85;
 export const AIM_LINE_OPACITY = 0.5;
 
 // --- Scoring (score = points; planetsPassed drives difficulty) ---
@@ -101,6 +101,10 @@ export const CONE_HALF_CAP = 0.4; // additional widening, so max ≈ 0.75 rad
 // and small planets can carry bigger orbits than big ones.
 export const RING_JITTER_MIN = 0.85;
 export const RING_JITTER_MAX = 1.25;
+/** Early orbits are this much bigger on average, easing back to 1×. */
+export const EARLY_RING_BOOST = 1.3;
+/** ...by this many planets in. */
+export const EARLY_RING_BOOST_PLANETS = 12;
 /** The occasional big one. */
 export const GIANT_RING_CHANCE = 0.1;
 export const GIANT_RING_SCALE = 1.6;

@@ -20,6 +20,7 @@ import {
 import {
   captureBandWidth,
   coneHalfAngle,
+  earlyRingBoost,
   jumpMax,
   jumpMin,
   planetRadius,
@@ -42,10 +43,12 @@ function buildPlanet(id: number, center: Vec2, radius: number, band: number): Pl
 /**
  * Per-planet ring variety: jitter the difficulty band so rings visibly vary
  * (small planets can out-ring big ones), with an occasional giant ring.
+ * The early-game boost sits under the jitter, so early orbits run big on
+ * average but can still roll small — and late ones tight but sometimes giant.
  */
 function sampleBand(state: GameState, n: number): number {
   'worklet';
-  let band = captureBandWidth(n);
+  let band = captureBandWidth(n) * earlyRingBoost(n);
   if (rand01(state) < GIANT_RING_CHANCE) {
     band *= GIANT_RING_SCALE;
   } else {

@@ -50,7 +50,12 @@ Per generated planet, the band gets a seeded jitter before building the ring:
 - floored at `BAND_MIN`; body radius stays independent, so small planets can
   out-ring big ones. The shrink-with-altitude trend is untouched.
 - Placement/corridor validation already uses real ring radii — no other code
-  changes. Start planet keeps the standard band (fair start).
+  changes.
+- **Follow-up (same pass):** early-game ring boost — bands run ×1.3 at planet
+  0, easing linearly to ×1 by planet 12, applied *under* the jitter. Early
+  orbits are big on average but can still roll small; late ones tight but
+  sometimes giant. The start planet always gets the full boost, un-jittered
+  (a run should never open on a cramped ring).
 
 ### Zone visibility
 

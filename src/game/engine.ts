@@ -32,6 +32,7 @@ import {
 } from './constants';
 import {
   captureBandWidth,
+  earlyRingBoost,
   orbitAngularSpeed,
   orbitDecayRate,
   planetRadius,
@@ -96,7 +97,9 @@ export function createInitialState(width: number, height: number, seed?: number)
     id: 0,
     center: { x: width * 0.5, y: 0 },
     radius: startRadius,
-    ringRadius: startRadius + captureBandWidth(0),
+    // The first orbit always gets the full early boost (no jitter — the run
+    // should never open on a cramped ring).
+    ringRadius: startRadius + captureBandWidth(0) * earlyRingBoost(0),
     color: PLANET_COLORS[0],
   };
   state.planets = [start];
