@@ -14,6 +14,7 @@ This repo uses **bun** (lockfile: `bun.lock`) — never npm/yarn/pnpm.
 - `bun start` — Expo dev server (scan QR with Expo Go on a real device)
 - `bun run ios` — dev server + open iOS simulator
 - `bun run typecheck` — `tsc --noEmit` (run after every change)
+- `bun test` — game-logic unit tests (pure `src/game/` code runs under bun directly)
 
 ## Stack
 
