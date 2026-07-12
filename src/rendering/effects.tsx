@@ -167,16 +167,23 @@ export function DeathShatter({ gameState }: { gameState: SharedValue<GameState> 
  * line back along the velocity while flying, an arc back along the orbit while
  * orbiting. No position buffer to maintain (and nothing to mutate across the
  * worklet boundary).
+ *
+ * History is truncated at the last release/capture: projecting further back
+ * would draw the trail where the ball never was (the pre-release history is
+ * an arc, not a line, and vice versa). So the trail grows out from the
+ * transition point to full length instead of popping in.
  */
 function trailPos(s: GameState, secondsBack: number): Vec2 | null {
   'worklet';
   if (s.phase === 'flying') {
+    if (secondsBack > s.time - s.lastReleaseAt) return null;
     return {
       x: s.ballPos.x - s.velocity.x * secondsBack,
       y: s.ballPos.y - s.velocity.y * secondsBack,
     };
   }
   if (s.phase === 'orbiting') {
+    if (secondsBack > s.time - s.lastCaptureAt) return null;
     const planet = findPlanet(s.planets, s.currentPlanetId);
     if (planet === null) return null;
     const angleBack = s.angle - s.direction * orbitAngularSpeed(s.planetsPassed) * secondsBack;
