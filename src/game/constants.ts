@@ -42,13 +42,13 @@ export const PERFECT_BAND_FRACTION = 0.25;
 // --- Capture latch-on (smooth settle instead of snapping to the ring) ---
 
 /** Seconds to ease from the capture point/speed onto the ring orbit. */
-export const CAPTURE_SETTLE_S = 0.35;
+export const CAPTURE_SETTLE_S = 0.6;
 /**
  * Cap on the initial angular speed (rad/s) right after capture. Velocity
  * continuity wants FLIGHT_SPEED / captureRadius, but a deep graze on a small
  * planet would whip at 20+ rad/s — cap it to a fast-but-readable spin.
  */
-export const CAPTURE_OMEGA_MAX = 9;
+export const CAPTURE_OMEGA_MAX = 7;
 
 // --- Camera ---
 
