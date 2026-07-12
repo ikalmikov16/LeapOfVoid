@@ -29,8 +29,10 @@ export const AIM_LINE_OPACITY = 0.5;
 export const CAPTURE_POINTS = 1;
 export const GRAZE_POINTS = 2;
 export const PERFECT_POINTS = 3;
+/** Points per planet skipped in a single jump (on top of capture points). */
+export const SKIP_POINTS = 2;
 /** Release within this fraction of a revolution to keep the streak alive. */
-export const COMBO_WINDOW_REVOLUTIONS = 0.5;
+export const COMBO_WINDOW_REVOLUTIONS = 0.75;
 export const COMBO_MULTIPLIER_CAP = 5;
 /** Closest approach within this of the surface = graze (nearly died). */
 export const GRAZE_MARGIN = 8;
@@ -67,19 +69,19 @@ export const MAX_PLANETS = 30;
 export const ZONE_SIZE = 20;
 
 /** Capture band width (ring minus body): the main difficulty dial. */
-export const BAND_START = 34;
+export const BAND_START = 38;
 export const BAND_MIN = 14;
-export const BAND_SHRINK_PER_PLANET = 0.25;
+export const BAND_SHRINK_PER_PLANET = 0.18;
 export const BAND_ZONE_STEP = 1.5;
 /** First planets of a run always get the widest band (fair start for clips). */
 export const FAIR_START_PLANETS = 5;
 
-export const ORBIT_SPEED_BASE = 2.6; // rad/s (~2.4s per revolution)
+export const ORBIT_SPEED_BASE = 2.3; // rad/s (~2.7s per revolution)
 export const ORBIT_SPEED_PER_PLANET = 0.02;
 export const ORBIT_SPEED_MAX = 4.0;
 
-export const PLANET_RADIUS_MIN = 20;
-export const PLANET_RADIUS_MAX = 28;
+export const PLANET_RADIUS_MIN = 17;
+export const PLANET_RADIUS_MAX = 25;
 export const PLANET_RADIUS_GROWTH = 0.06; // px per planet added to both bounds
 export const PLANET_RADIUS_GROWTH_CAP = 6;
 
@@ -94,6 +96,14 @@ export const JUMP_MAX_CAP = 90;
 export const CONE_HALF_BASE = 0.35;
 export const CONE_HALF_GROWTH = 0.008;
 export const CONE_HALF_CAP = 0.4; // additional widening, so max ≈ 0.75 rad
+
+// Ring variety: per-planet seeded jitter on the band, so rings visibly vary
+// and small planets can carry bigger orbits than big ones.
+export const RING_JITTER_MIN = 0.85;
+export const RING_JITTER_MAX = 1.25;
+/** The occasional big one. */
+export const GIANT_RING_CHANCE = 0.1;
+export const GIANT_RING_SCALE = 1.6;
 
 // --- Orbit decay (anti-camping) ---
 
@@ -125,7 +135,7 @@ export const PERFECT_PULSE_S = 0.5;
 /** Background gradient cross-fade time on zone change. */
 export const ZONE_FADE_S = 1.5;
 /** How long the zone name flashes in the HUD (JS side). */
-export const ZONE_FLASH_MS = 2200;
+export const ZONE_FLASH_MS = 3000;
 /** Delay before the death overlay fades in, so the shatter reads first. */
 export const DEATH_OVERLAY_DELAY_MS = 350;
 

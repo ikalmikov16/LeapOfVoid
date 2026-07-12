@@ -211,10 +211,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   zoneName: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 26,
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 34,
     fontWeight: '900',
-    letterSpacing: 6,
+    letterSpacing: 8,
+    textAlign: 'center',
   },
   hintWrap: {
     position: 'absolute',

@@ -9,11 +9,11 @@ export interface ZonePalette {
 
 export const ZONES: readonly ZonePalette[] = [
   { name: 'THE VOID', bgTop: '#0B0B22', bgBottom: '#050510' },
-  { name: 'EMBER FIELD', bgTop: '#1E0E12', bgBottom: '#0A0507' },
-  { name: 'VIOLET DEEP', bgTop: '#170B2A', bgBottom: '#090412' },
-  { name: 'FROSTBITE', bgTop: '#08182A', bgBottom: '#030A12' },
-  { name: 'GOLDEN WASTES', bgTop: '#20170A', bgBottom: '#0C0904' },
-  { name: 'CRIMSON DRIFT', bgTop: '#230A12', bgBottom: '#0E0407' },
+  { name: 'EMBER FIELD', bgTop: '#2A1216', bgBottom: '#120709' },
+  { name: 'VIOLET DEEP', bgTop: '#1F0F38', bgBottom: '#0C0618' },
+  { name: 'FROSTBITE', bgTop: '#0B2238', bgBottom: '#051019' },
+  { name: 'GOLDEN WASTES', bgTop: '#2B1F0E', bgBottom: '#110C05' },
+  { name: 'CRIMSON DRIFT', bgTop: '#2E0D17', bgBottom: '#130509' },
 ];
 
 export function zonePalette(zoneIndex: number): ZonePalette {

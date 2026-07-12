@@ -28,6 +28,7 @@ import {
   PERFECT_POINTS,
   PLANET_COLORS,
   RESTART_COOLDOWN_S,
+  SKIP_POINTS,
 } from './constants';
 import {
   captureBandWidth,
@@ -49,10 +50,10 @@ export function findPlanet(planets: Planet[], id: number): Planet | null {
   return null;
 }
 
-/** Current combo multiplier: consecutive quick releases, floored at ×1. */
+/** Current combo multiplier: the first quick hop already earns ×2. */
 export function comboMultiplier(comboLinks: number): number {
   'worklet';
-  return Math.min(Math.max(comboLinks, 1), COMBO_MULTIPLIER_CAP);
+  return Math.min(1 + comboLinks, COMBO_MULTIPLIER_CAP);
 }
 
 export function createInitialState(width: number, height: number, seed?: number): GameState {
@@ -184,23 +185,33 @@ function capture(state: GameState, planet: Planet, point: Vec2, approachDistance
   } else if (approachDistance - planet.radius <= GRAZE_MARGIN) {
     kind = 1;
   }
-  state.planetsPassed += 1;
-  state.score +=
-    CAPTURE_POINTS * comboMultiplier(state.comboLinks) +
-    (kind === 2 ? PERFECT_POINTS : kind === 1 ? GRAZE_POINTS : 0);
+
+  // Progression: planet ids are chain ordinals, so planetsPassed tracks
+  // *altitude* — a jump that skips planets advances difficulty and zones by
+  // the full distance, and pays SKIP_POINTS per planet skipped. Capturing at
+  // or below the high-water mark (jumping backward, re-grabbing the start
+  // planet) is a safety net worth zero points — otherwise bouncing between
+  // two planets would farm score forever.
+  if (planet.id > state.planetsPassed) {
+    const skipped = planet.id - state.planetsPassed - 1;
+    state.planetsPassed = planet.id;
+    state.score +=
+      CAPTURE_POINTS * comboMultiplier(state.comboLinks) +
+      (kind === 2 ? PERFECT_POINTS : kind === 1 ? GRAZE_POINTS : 0) +
+      skipped * SKIP_POINTS;
+    const zone = zoneIndexOf(state.planetsPassed);
+    if (zone !== state.zoneIndex) {
+      state.zoneIndex = zone;
+      state.zoneChangedAt = state.time;
+    }
+  }
 
   // Effect stamps (hash instead of consuming rngState — generation stays
   // deterministic regardless of how captures interleave).
   state.lastCaptureAt = state.time;
   state.captureKind = kind;
   state.capturePos = { x: state.ballPos.x, y: state.ballPos.y };
-  state.effectSeed = (state.rngState ^ Math.imul(state.planetsPassed, 2654435761)) >>> 0;
-
-  const zone = zoneIndexOf(state.planetsPassed);
-  if (zone !== state.zoneIndex) {
-    state.zoneIndex = zone;
-    state.zoneChangedAt = state.time;
-  }
+  state.effectSeed = (state.rngState ^ Math.imul(state.planetsPassed + 1, 2654435761)) >>> 0;
 }
 
 type FlightEvent =

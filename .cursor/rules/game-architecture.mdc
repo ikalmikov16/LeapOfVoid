@@ -50,7 +50,9 @@ confusion-difficulty, crashes keep the aiming skill.
 
 Scoring is split from progression: `planetsPassed` drives every difficulty
 dial and zones; `score` is points (capture × combo multiplier + graze/perfect
-bonuses). Never feed `score` into difficulty.
++ skip bonuses). Never feed `score` into difficulty. Planet ids are chain
+ordinals: `planetsPassed` = the highest id reached (skips advance it fully;
+captures at/below the high-water mark score zero — prevents bounce-farming).
 
 On capture: orbit direction follows approach direction; orbit radius snaps to the
 planet's fixed ring (v1). Release velocity is the orbit tangent.

@@ -2,14 +2,19 @@
 // Worklet ordering rule applies: callees defined before callers.
 
 import {
-  CORRIDOR_CLEARANCE,
   BALL_RADIUS,
+  BAND_MIN,
+  CORRIDOR_CLEARANCE,
   GENERATE_AHEAD_SCREENS,
+  GIANT_RING_CHANCE,
+  GIANT_RING_SCALE,
   MAX_PLACEMENT_ATTEMPTS,
   MAX_PLANETS,
   PLANET_COLORS,
   PLANET_GAP,
   PRUNE_BEHIND_SCREENS,
+  RING_JITTER_MAX,
+  RING_JITTER_MIN,
   SCREEN_X_MARGIN,
 } from './constants';
 import {
@@ -23,15 +28,30 @@ import { closestApproachOnSegment } from './geometry';
 import { rand01, randRange } from './rng';
 import type { GameState, Planet, Vec2 } from './types';
 
-function buildPlanet(id: number, center: Vec2, radius: number): Planet {
+function buildPlanet(id: number, center: Vec2, radius: number, band: number): Planet {
   'worklet';
   return {
     id,
     center,
     radius,
-    ringRadius: radius + captureBandWidth(id),
+    ringRadius: radius + band,
     color: PLANET_COLORS[id % PLANET_COLORS.length],
   };
+}
+
+/**
+ * Per-planet ring variety: jitter the difficulty band so rings visibly vary
+ * (small planets can out-ring big ones), with an occasional giant ring.
+ */
+function sampleBand(state: GameState, n: number): number {
+  'worklet';
+  let band = captureBandWidth(n);
+  if (rand01(state) < GIANT_RING_CHANCE) {
+    band *= GIANT_RING_SCALE;
+  } else {
+    band *= RING_JITTER_MIN + rand01(state) * (RING_JITTER_MAX - RING_JITTER_MIN);
+  }
+  return Math.max(band, BAND_MIN);
 }
 
 /**
@@ -72,7 +92,8 @@ export function generateNextPlanet(state: GameState, planets: Planet[]): Planet 
   const prev = planets[planets.length - 1];
   const n = state.nextPlanetId;
   const radius = planetRadius(n, rand01(state));
-  const ring = radius + captureBandWidth(n);
+  const band = sampleBand(state, n);
+  const ring = radius + band;
   const xMin = ring + SCREEN_X_MARGIN;
   const xMax = state.width - ring - SCREEN_X_MARGIN;
 
@@ -86,13 +107,13 @@ export function generateNextPlanet(state: GameState, planets: Planet[]): Planet 
     const ddy = center.y - prev.center.y;
     if (ddx * ddx + ddy * ddy < jumpMin(n) * jumpMin(n)) continue;
     if (isValidPlacement(planets, prev, center, ring)) {
-      return buildPlanet(n, center, radius);
+      return buildPlanet(n, center, radius, band);
     }
   }
 
   // Fallback: straight up at max jump distance, x pulled toward screen center.
   const cx = Math.min(Math.max(state.width * 0.5, xMin), xMax);
-  return buildPlanet(n, { x: cx, y: prev.center.y - jumpMax(n) }, radius);
+  return buildPlanet(n, { x: cx, y: prev.center.y - jumpMax(n) }, radius, band);
 }
 
 /**

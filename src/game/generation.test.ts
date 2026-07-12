@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { BALL_RADIUS, MAX_PLANETS, PLANET_GAP } from './constants';
+import { BALL_RADIUS, BAND_MIN, MAX_PLANETS, PLANET_GAP } from './constants';
 import { createInitialState } from './engine';
 import { updatePlanetWindow } from './generation';
 import { closestApproachOnSegment } from './geometry';
@@ -69,6 +69,28 @@ describe('procedural generation', () => {
       // The climb actually generated a deep chain.
       expect(s.nextPlanetId).toBeGreaterThan(200);
     }
+  });
+
+  test('ring sizes vary between planets and respect the band floor', () => {
+    const s = createInitialState(WIDTH, HEIGHT, 7);
+    const bands = new Set<number>();
+    let giants = 0;
+    let seen = 0;
+    for (let i = 0; i < 40; i++) {
+      s.cameraY -= 400;
+      updatePlanetWindow(s);
+      for (const p of s.planets) {
+        const band = p.ringRadius - p.radius;
+        bands.add(Math.round(band * 10));
+        expect(band).toBeGreaterThanOrEqual(BAND_MIN - 1e-6);
+        if (p.id > seen) {
+          seen = p.id;
+          if (band > 34 * 1.4) giants++; // unmistakably a giant ring
+        }
+      }
+    }
+    expect(bands.size).toBeGreaterThan(10); // genuinely varied, not quantized
+    expect(giants).toBeGreaterThan(0); // the occasional big one exists
   });
 
   test('pruning drops planets far below but never the current one', () => {

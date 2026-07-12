@@ -5,6 +5,7 @@ import {
   GRACE_AFTER_CAPTURE_S,
   GRAZE_POINTS,
   PERFECT_POINTS,
+  SKIP_POINTS,
 } from './constants';
 import { orbitDecayRate } from './difficulty';
 import { createInitialState, handleTap, stepGame } from './engine';
@@ -68,8 +69,9 @@ function runUntilSettled(state: GameState, maxFrames = 600): GameState {
   return state;
 }
 
+// id 1: capturing it from planetsPassed 0 counts as progression.
 const planet: Planet = {
-  id: 0,
+  id: 1,
   center: { x: 200, y: 400 },
   radius: 20,
   ringRadius: 50, // band = 30, center at distance 35, perfect window ±3.75
@@ -111,7 +113,7 @@ describe('flight resolution', () => {
     expect(s.planetsPassed).toBe(1);
     expect(s.score).toBe(1); // no combo, approach 40 is neither graze nor perfect
     expect(s.captureKind).toBe(0);
-    expect(s.currentPlanetId).toBe(0);
+    expect(s.currentPlanetId).toBe(1);
     expect(s.orbitRadius).toBeCloseTo(planet.ringRadius);
     expect(s.revolutions).toBe(0);
     expect(s.lastCaptureAt).toBeCloseTo(s.time);
@@ -156,7 +158,7 @@ describe('flight resolution', () => {
   test('departed planet cannot recapture on release', () => {
     const s = makeState([planet], {
       phase: 'orbiting',
-      currentPlanetId: 0,
+      currentPlanetId: 1,
       angle: Math.PI / 2,
       orbitRadius: planet.ringRadius,
       ballPos: { x: 200, y: 450 },
@@ -175,7 +177,7 @@ describe('scoring', () => {
   test('quick release increments the streak and stamps the event', () => {
     const s = makeState([planet], {
       phase: 'orbiting',
-      currentPlanetId: 0,
+      currentPlanetId: 1,
       orbitRadius: planet.ringRadius,
       revolutions: 0.2,
       comboLinks: 2,
@@ -190,15 +192,15 @@ describe('scoring', () => {
   test('streak dies the moment the combo window closes, while still orbiting', () => {
     const s = makeState([planet], {
       phase: 'orbiting',
-      currentPlanetId: 0,
+      currentPlanetId: 1,
       orbitRadius: planet.ringRadius,
       comboLinks: 3,
       ballPos: { x: 250, y: 400 },
     });
-    // Half a revolution at 2.6 rad/s ≈ 1.21s.
-    for (let i = 0; i < 60; i++) stepGame(s, DT); // 1s — window still open
+    // 0.75 revolutions at 2.3 rad/s ≈ 2.05s.
+    for (let i = 0; i < 100; i++) stepGame(s, DT); // 1.67s — window still open
     expect(s.comboLinks).toBe(3);
-    for (let i = 0; i < 30; i++) stepGame(s, DT); // 1.5s — window closed
+    for (let i = 0; i < 40; i++) stepGame(s, DT); // 2.33s — window closed
     expect(s.phase).toBe('orbiting');
     expect(s.comboLinks).toBe(0);
   });
@@ -211,7 +213,7 @@ describe('scoring', () => {
     });
     runUntilSettled(s);
     expect(s.phase).toBe('orbiting');
-    expect(s.score).toBe(3); // 1 × ×3
+    expect(s.score).toBe(4); // 1 × ×4 (first quick hop is already ×2)
     expect(s.planetsPassed).toBe(1);
   });
 
@@ -243,8 +245,31 @@ describe('scoring', () => {
     expect(s.score).toBe(1 + PERFECT_POINTS);
   });
 
-  test('crossing a zone boundary stamps the zone change', () => {
+  test('skipping planets pays skip points and advances difficulty to the id', () => {
+    const far: Planet = { ...planet, id: 4 };
+    const s = makeState([far], { ballPos: { x: 0, y: 440 }, velocity: { x: 520, y: 0 } });
+    runUntilSettled(s);
+    expect(s.phase).toBe('orbiting');
+    expect(s.planetsPassed).toBe(4); // altitude, not capture count
+    expect(s.score).toBe(1 + 3 * SKIP_POINTS); // capture ×1 + 3 skipped
+  });
+
+  test('capturing at or below the high-water mark scores nothing (no farming)', () => {
     const s = makeState([planet], {
+      ballPos: { x: 0, y: 440 },
+      velocity: { x: 520, y: 0 },
+      planetsPassed: 5,
+    });
+    runUntilSettled(s);
+    expect(s.phase).toBe('orbiting'); // still a safety net...
+    expect(s.currentPlanetId).toBe(1);
+    expect(s.planetsPassed).toBe(5); // ...but no progress
+    expect(s.score).toBe(0); // ...and no points
+  });
+
+  test('crossing a zone boundary stamps the zone change', () => {
+    const boundary: Planet = { ...planet, id: 20 };
+    const s = makeState([boundary], {
       ballPos: { x: 0, y: 440 },
       velocity: { x: 520, y: 0 },
       planetsPassed: 19,
@@ -258,7 +283,7 @@ describe('scoring', () => {
   test('difficulty follows planetsPassed, not points', () => {
     const s = makeState([planet], {
       phase: 'orbiting',
-      currentPlanetId: 0,
+      currentPlanetId: 1,
       orbitRadius: planet.ringRadius,
       score: 9999,
       planetsPassed: 0,
@@ -274,7 +299,7 @@ describe('orbit decay', () => {
   test('camping burns up on the surface at the decay rate', () => {
     const s = makeState([planet], {
       phase: 'orbiting',
-      currentPlanetId: 0,
+      currentPlanetId: 1,
       orbitRadius: planet.ringRadius,
       planetsPassed: 10,
       ballPos: { x: 250, y: 400 },
@@ -294,7 +319,7 @@ describe('orbit decay', () => {
   test('grace window pauses decay', () => {
     const s = makeState([planet], {
       phase: 'orbiting',
-      currentPlanetId: 0,
+      currentPlanetId: 1,
       orbitRadius: planet.ringRadius,
       planetsPassed: 10,
       graceUntil: 5,
@@ -311,7 +336,7 @@ describe('camera', () => {
   test('converges up toward the orbited planet anchor and never moves down', () => {
     const s = makeState([planet], {
       phase: 'orbiting',
-      currentPlanetId: 0,
+      currentPlanetId: 1,
       orbitRadius: planet.ringRadius,
       ballPos: { x: 250, y: 400 },
     });
