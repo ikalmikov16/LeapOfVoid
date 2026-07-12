@@ -44,6 +44,9 @@ export interface GameState {
   direction: OrbitDirection;
   /** Current orbit radius; decays from ringRadius toward the surface. */
   orbitRadius: number;
+  /** Distance from the planet center where the last capture happened; the
+   * orbit eases from here out to ringRadius over CAPTURE_SETTLE_S. */
+  captureRadius: number;
   /** No orbit decay before this time (fair-start grace after each capture). */
   graceUntil: number;
   ballPos: Vec2;

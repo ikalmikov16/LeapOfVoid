@@ -39,6 +39,17 @@ export const GRAZE_MARGIN = 8;
 /** Middle fraction of the capture band that counts as a perfect capture. */
 export const PERFECT_BAND_FRACTION = 0.25;
 
+// --- Capture latch-on (smooth settle instead of snapping to the ring) ---
+
+/** Seconds to ease from the capture point/speed onto the ring orbit. */
+export const CAPTURE_SETTLE_S = 0.35;
+/**
+ * Cap on the initial angular speed (rad/s) right after capture. Velocity
+ * continuity wants FLIGHT_SPEED / captureRadius, but a deep graze on a small
+ * planet would whip at 20+ rad/s — cap it to a fast-but-readable spin.
+ */
+export const CAPTURE_OMEGA_MAX = 9;
+
 // --- Camera ---
 
 /** While orbiting, the current planet sits this fraction down the screen. */
@@ -47,6 +58,12 @@ export const CAMERA_PLANET_ANCHOR = 0.65;
 export const CAMERA_BALL_ANCHOR = 0.45;
 /** Exponential smoothing rate (1/s); higher = snappier follow. */
 export const CAMERA_SMOOTHING = 6;
+/**
+ * Downward recenter rate while ORBITING only (a sideways hop can put the new
+ * anchor below the camera; without this the screen sits frozen). Flying never
+ * drags the camera down — downward flights still fall out of view and die.
+ */
+export const CAMERA_DOWN_SMOOTHING = 2.5;
 
 // --- Procedural generation ---
 

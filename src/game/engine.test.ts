@@ -39,6 +39,7 @@ function makeState(planets: Planet[], overrides: Partial<GameState>): GameState 
     angle: 0,
     direction: 1,
     orbitRadius: 0,
+    captureRadius: 0,
     graceUntil: 0,
     ballPos: { x: 0, y: 0 },
     velocity: { x: 0, y: 0 },
@@ -114,15 +115,41 @@ describe('flight resolution', () => {
     expect(s.score).toBe(1); // no combo, approach 40 is neither graze nor perfect
     expect(s.captureKind).toBe(0);
     expect(s.currentPlanetId).toBe(1);
-    expect(s.orbitRadius).toBeCloseTo(planet.ringRadius);
     expect(s.revolutions).toBe(0);
     expect(s.lastCaptureAt).toBeCloseTo(s.time);
     expect(s.graceUntil).toBeGreaterThanOrEqual(s.time);
     expect(s.graceUntil).toBeLessThanOrEqual(s.time + GRACE_AFTER_CAPTURE_S);
-    // Snapped onto the ring.
+    // Position is continuous: the orbit starts at the capture distance (40),
+    // not snapped out to the ring.
+    expect(s.orbitRadius).toBeCloseTo(40, 0);
     const dx = s.ballPos.x - planet.center.x;
     const dy = s.ballPos.y - planet.center.y;
-    expect(Math.hypot(dx, dy)).toBeCloseTo(planet.ringRadius);
+    expect(Math.hypot(dx, dy)).toBeCloseTo(s.orbitRadius);
+  });
+
+  test('capture settles onto the ring smoothly (no snap)', () => {
+    const s = makeState([planet], { ballPos: { x: 0, y: 440 }, velocity: { x: 520, y: 0 } });
+    runUntilSettled(s);
+    expect(s.phase).toBe('orbiting');
+    expect(s.orbitRadius).toBeCloseTo(40, 0);
+
+    // The first settle frames whip faster than the steady orbit speed
+    // (velocity continuity with the flight), then calm down.
+    const angleBefore = s.angle;
+    stepGame(s, DT);
+    expect(Math.abs(s.angle - angleBefore)).toBeGreaterThan(2.3 * DT * 2);
+
+    // The radius eases monotonically out to the ring and stays there.
+    let last = s.orbitRadius;
+    for (let i = 0; i < 60; i++) {
+      stepGame(s, DT);
+      expect(s.orbitRadius).toBeGreaterThanOrEqual(last - 1e-9);
+      last = s.orbitRadius;
+    }
+    expect(s.phase).toBe('orbiting');
+    expect(s.orbitRadius).toBeCloseTo(planet.ringRadius);
+    const d = Math.hypot(s.ballPos.x - planet.center.x, s.ballPos.y - planet.center.y);
+    expect(d).toBeCloseTo(planet.ringRadius);
   });
 
   test('capture direction follows approach direction', () => {
@@ -347,6 +374,22 @@ describe('camera', () => {
       expect(s.cameraY).toBeLessThanOrEqual(last + 1e-9);
       last = s.cameraY;
     }
+    expect(Math.abs(s.cameraY - target)).toBeLessThan(2);
+  });
+
+  test('sideways hop: camera eases back down to the new anchor while orbiting', () => {
+    // Camera sits far above the anchor (as after a lateral capture); while
+    // orbiting it must recenter downward instead of leaving the view frozen.
+    const s = makeState([planet], {
+      phase: 'orbiting',
+      currentPlanetId: 1,
+      orbitRadius: planet.ringRadius,
+      cameraY: -600,
+      ballPos: { x: 250, y: 400 },
+    });
+    const target = planet.center.y - s.height * 0.65;
+    expect(target).toBeGreaterThan(s.cameraY); // anchor is below the camera
+    for (let i = 0; i < 300; i++) stepGame(s, DT);
     expect(Math.abs(s.cameraY - target)).toBeLessThan(2);
   });
 

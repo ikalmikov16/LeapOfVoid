@@ -54,8 +54,15 @@ dial and zones; `score` is points (capture × combo multiplier + graze/perfect
 ordinals: `planetsPassed` = the highest id reached (skips advance it fully;
 captures at/below the high-water mark score zero — prevents bounce-farming).
 
-On capture: orbit direction follows approach direction; orbit radius snaps to the
-planet's fixed ring (v1). Release velocity is the orbit tangent.
+On capture: orbit direction follows approach direction; the orbit starts exactly
+at the capture point and settles out to the planet's fixed ring over
+`CAPTURE_SETTLE_S`, blending angular speed from the (capped) flight speed down to
+the orbit speed — position and velocity stay continuous, no snap. Release
+velocity is the orbit tangent.
+
+Camera: climbing is snappy; while orbiting it may also ease back down to the
+anchor (sideways hops can put the anchor below the camera). It never moves down
+during flight — downward flights fall out of the viewport and die.
 
 ## Tuning
 

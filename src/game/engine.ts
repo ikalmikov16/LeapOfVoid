@@ -13,9 +13,12 @@
 import {
   BALL_RADIUS,
   CAMERA_BALL_ANCHOR,
+  CAMERA_DOWN_SMOOTHING,
   CAMERA_PLANET_ANCHOR,
   CAMERA_SMOOTHING,
+  CAPTURE_OMEGA_MAX,
   CAPTURE_POINTS,
+  CAPTURE_SETTLE_S,
   COMBO_MULTIPLIER_CAP,
   COMBO_WINDOW_REVOLUTIONS,
   FLIGHT_SPEED,
@@ -70,6 +73,7 @@ export function createInitialState(width: number, height: number, seed?: number)
     angle: Math.PI / 2,
     direction: 1,
     orbitRadius: 0,
+    captureRadius: 0,
     graceUntil: 0,
     ballPos: { x: 0, y: 0 },
     velocity: { x: 0, y: 0 },
@@ -138,9 +142,28 @@ function stepOrbit(state: GameState, dt: number): void {
   'worklet';
   const planet = findPlanet(state.planets, state.currentPlanetId);
   if (planet === null) return;
-  // Decay: the orbit spirals inward once past the grace window; reaching the
-  // surface is the anti-camping death.
-  if (state.time >= state.graceUntil) {
+
+  const baseSpeed = orbitAngularSpeed(state.planetsPassed);
+  let angularSpeed = baseSpeed;
+  const settleT = Math.min(1, (state.time - state.lastCaptureAt) / CAPTURE_SETTLE_S);
+  if (settleT < 1) {
+    // Latch-on settle: ease the radius from the capture distance out to the
+    // ring, and the angular speed from the flight speed (which is exactly
+    // tangential at the closest-approach point) down to the orbit speed.
+    // Position AND velocity stay continuous — no snap. Smoothstep so both
+    // ends of the blend are gentle. Settle always finishes inside the
+    // capture grace window, so it never fights orbit decay.
+    const k = settleT * settleT * (3 - 2 * settleT);
+    state.orbitRadius = state.captureRadius + (planet.ringRadius - state.captureRadius) * k;
+    const captureSpeed = Math.min(FLIGHT_SPEED / Math.max(state.captureRadius, 1), CAPTURE_OMEGA_MAX);
+    angularSpeed = captureSpeed + (baseSpeed - captureSpeed) * k;
+  } else if (state.time < state.graceUntil) {
+    // Settle done (its last frame lands a hair short of the ring); hold the
+    // exact ring until decay takes over after grace.
+    state.orbitRadius = planet.ringRadius;
+  } else {
+    // Decay: the orbit spirals inward once past the grace window; reaching
+    // the surface is the anti-camping death.
     const rate = orbitDecayRate(state.planetsPassed);
     if (rate > 0) {
       state.orbitRadius -= rate * dt;
@@ -151,11 +174,12 @@ function stepOrbit(state: GameState, dt: number): void {
       }
     }
   }
-  const angularSpeed = orbitAngularSpeed(state.planetsPassed);
   state.angle += state.direction * angularSpeed * dt;
   // Track revolutions; the streak dies the instant the combo window closes
   // (not at release), so the trail visibly cools while you hesitate.
-  state.revolutions += (angularSpeed * dt) / (Math.PI * 2);
+  // Bookkeeping uses the base speed so the settle whip after a deep graze
+  // can't eat into the combo window.
+  state.revolutions += (baseSpeed * dt) / (Math.PI * 2);
   if (state.revolutions >= COMBO_WINDOW_REVOLUTIONS && state.comboLinks > 0) {
     state.comboLinks = 0;
   }
@@ -172,10 +196,12 @@ function capture(state: GameState, planet: Planet, point: Vec2, approachDistance
   state.angle = Math.atan2(radial.y, radial.x);
   state.currentPlanetId = planet.id;
   state.departedPlanetId = -1;
-  // v1 rule: snap to the planet's fixed ring; decay then works inward from it.
-  state.orbitRadius = planet.ringRadius;
+  // Orbit starts exactly at the capture point; stepOrbit settles it out to
+  // the planet's fixed ring over CAPTURE_SETTLE_S, then decay works inward.
+  state.orbitRadius = approachDistance;
+  state.captureRadius = approachDistance;
   state.graceUntil = state.time + GRACE_AFTER_CAPTURE_S;
-  state.ballPos = pointOnCircle(planet.center, planet.ringRadius, state.angle);
+  state.ballPos = pointOnCircle(planet.center, approachDistance, state.angle);
   state.phase = 'orbiting';
   state.revolutions = 0;
 
@@ -297,10 +323,14 @@ function stepCamera(state: GameState, dt: number): void {
     if (planet === null) return;
     target = planet.center.y - state.height * CAMERA_PLANET_ANCHOR;
   }
-  // The camera only climbs (world y decreases). Downward flights fall out of
-  // the viewport and die instead of dragging the camera back down.
+  // Climbing is snappy. While ORBITING the camera may also ease back down —
+  // a sideways hop can put the new anchor below the camera, and without the
+  // recenter the screen just sits frozen. Flying never drags the camera down:
+  // downward flights still fall out of the viewport and die.
   if (target < state.cameraY) {
     state.cameraY += (target - state.cameraY) * Math.min(1, CAMERA_SMOOTHING * dt);
+  } else if (state.phase === 'orbiting') {
+    state.cameraY += (target - state.cameraY) * Math.min(1, CAMERA_DOWN_SMOOTHING * dt);
   }
 }
 
