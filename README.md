@@ -10,10 +10,10 @@ Design doc: [`orbit-game-plan.md`](./orbit-game-plan.md)
 ## Development
 
 ```bash
-npm install
-npm start          # Expo dev server — scan the QR with Expo Go on your phone
-npm run ios        # or open the iOS simulator
-npm run typecheck  # TypeScript check
+bun install
+bun start          # Expo dev server — scan the QR with Expo Go on your phone
+bun run ios        # or open the iOS simulator
+bun run typecheck  # TypeScript check
 ```
 
 Built with Expo (React Native + TypeScript), rendered on a single

@@ -9,9 +9,11 @@ user says otherwise.
 
 ## Commands
 
-- `npm start` — Expo dev server (scan QR with Expo Go on a real device)
-- `npm run ios` — dev server + open iOS simulator
-- `npm run typecheck` — `tsc --noEmit` (run after every change)
+This repo uses **bun** (lockfile: `bun.lock`) — never npm/yarn/pnpm.
+
+- `bun start` — Expo dev server (scan QR with Expo Go on a real device)
+- `bun run ios` — dev server + open iOS simulator
+- `bun run typecheck` — `tsc --noEmit` (run after every change)
 
 ## Stack
 
@@ -22,7 +24,7 @@ Expo SDK 57 / RN 0.86 / React 19 / TypeScript strict. Rendering:
 
 Expo APIs change between SDK versions: verify against
 https://docs.expo.dev/versions/v57.0.0/ instead of trusting memory.
-Install native deps with `npx expo install`, not bare `npm install`.
+Install native deps with `bunx expo install`, not bare `bun add`.
 
 ## Structure
 
