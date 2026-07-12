@@ -17,6 +17,16 @@ alwaysApply: false
 - `src/state/` — zustand stores for app-level state only (screen, settings,
   best score). **Never put per-frame game state in zustand or React state.**
 
+## Worklet rules (crash-critical)
+
+Game functions carry a `'worklet'` directive so they run on the UI thread.
+The worklets runtime in Expo Go SDK 54 (react-native-worklets 0.5.x) captures a
+worklet's same-module references at definition time — **a worklet calling another
+function in the same file must be defined AFTER its callee**. Order every module
+callees-first, entry points last. Getting this wrong is not a red-box: it
+hard-crashes Expo Go on launch ("X is not a function (it is undefined)" thrown
+inside the UI-thread frame callback aborts the process).
+
 ## The frame loop
 
 - Drive the simulation with a Reanimated `useFrameCallback`; step the game model

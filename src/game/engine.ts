@@ -1,6 +1,11 @@
 // The simulation. Pure TypeScript, no React/Skia/Reanimated imports.
 // Every function is a worklet so the whole sim runs on the UI thread.
 //
+// IMPORTANT: definition order matters. The worklets runtime bundled in Expo Go
+// SDK 54 (react-native-worklets 0.5.x) captures a worklet's outer references at
+// module-evaluation time, so every function must be defined BEFORE any worklet
+// that calls it — callees first, entry points (handleTap, stepGame) last.
+//
 // Callers own mutation safety: pass a fresh shallow copy of the state into
 // stepGame/handleTap, and these functions only ever replace top-level fields
 // (never mutate nested objects), so the previous state object is never touched.
@@ -50,26 +55,6 @@ export function createInitialState(width: number, height: number): GameState {
   };
 }
 
-/** Single tap: release while orbiting, restart when dead, no-op in flight. */
-export function handleTap(state: GameState): GameState {
-  'worklet';
-  if (state.phase === 'orbiting') {
-    release(state);
-    return state;
-  }
-  if (state.phase === 'dead' && state.time - state.deathTime >= RESTART_COOLDOWN_S) {
-    return createInitialState(state.width, state.height);
-  }
-  return state;
-}
-
-export function stepGame(state: GameState, dt: number): void {
-  'worklet';
-  state.time += dt;
-  if (state.phase === 'orbiting') stepOrbit(state, dt);
-  else if (state.phase === 'flying') stepFlight(state, dt);
-}
-
 function release(state: GameState): void {
   'worklet';
   // Velocity is the orbit tangent: d/dt of (cos a, sin a) scaled by direction.
@@ -86,6 +71,29 @@ function stepOrbit(state: GameState, dt: number): void {
   const planet = state.planets[state.currentPlanetIndex];
   state.angle += state.direction * ORBIT_ANGULAR_SPEED * dt;
   state.ballPos = pointOnCircle(planet.center, planet.ringRadius, state.angle);
+}
+
+function die(state: GameState, cause: 'crash' | 'lost'): void {
+  'worklet';
+  state.phase = 'dead';
+  state.deathCause = cause;
+  state.deathTime = state.time;
+}
+
+function capture(state: GameState, planetIndex: number, point: Vec2): void {
+  'worklet';
+  const planet = state.planets[planetIndex];
+  const radial = { x: point.x - planet.center.x, y: point.y - planet.center.y };
+  // Orbit direction follows the approach direction so the flow feels continuous.
+  const cross = radial.x * state.velocity.y - radial.y * state.velocity.x;
+  state.direction = cross >= 0 ? 1 : -1;
+  state.angle = Math.atan2(radial.y, radial.x);
+  state.currentPlanetIndex = planetIndex;
+  state.departedPlanetIndex = -1;
+  // v1 rule: snap to the planet's fixed ring.
+  state.ballPos = pointOnCircle(planet.center, planet.ringRadius, state.angle);
+  state.phase = 'orbiting';
+  state.score += 1;
 }
 
 type FlightEvent =
@@ -148,25 +156,22 @@ function stepFlight(state: GameState, dt: number): void {
   capture(state, event.planetIndex, event.point);
 }
 
-function capture(state: GameState, planetIndex: number, point: Vec2): void {
+/** Single tap: release while orbiting, restart when dead, no-op in flight. */
+export function handleTap(state: GameState): GameState {
   'worklet';
-  const planet = state.planets[planetIndex];
-  const radial = { x: point.x - planet.center.x, y: point.y - planet.center.y };
-  // Orbit direction follows the approach direction so the flow feels continuous.
-  const cross = radial.x * state.velocity.y - radial.y * state.velocity.x;
-  state.direction = cross >= 0 ? 1 : -1;
-  state.angle = Math.atan2(radial.y, radial.x);
-  state.currentPlanetIndex = planetIndex;
-  state.departedPlanetIndex = -1;
-  // v1 rule: snap to the planet's fixed ring.
-  state.ballPos = pointOnCircle(planet.center, planet.ringRadius, state.angle);
-  state.phase = 'orbiting';
-  state.score += 1;
+  if (state.phase === 'orbiting') {
+    release(state);
+    return state;
+  }
+  if (state.phase === 'dead' && state.time - state.deathTime >= RESTART_COOLDOWN_S) {
+    return createInitialState(state.width, state.height);
+  }
+  return state;
 }
 
-function die(state: GameState, cause: 'crash' | 'lost'): void {
+export function stepGame(state: GameState, dt: number): void {
   'worklet';
-  state.phase = 'dead';
-  state.deathCause = cause;
-  state.deathTime = state.time;
+  state.time += dt;
+  if (state.phase === 'orbiting') stepOrbit(state, dt);
+  else if (state.phase === 'flying') stepFlight(state, dt);
 }
