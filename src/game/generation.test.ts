@@ -1,5 +1,12 @@
 import { describe, expect, test } from 'bun:test';
-import { BALL_RADIUS, BAND_MIN, MAX_PLANETS, PLANET_GAP } from './constants';
+import {
+  BALL_RADIUS,
+  BAND_MIN,
+  MAX_PLANETS,
+  PLANET_GAP,
+  RING_JITTER_MAX,
+} from './constants';
+import { captureBandWidth, earlyRingBoost } from './difficulty';
 import { createInitialState } from './engine';
 import { updatePlanetWindow } from './generation';
 import { closestApproachOnSegment } from './geometry';
@@ -85,12 +92,45 @@ describe('procedural generation', () => {
         expect(band).toBeGreaterThanOrEqual(BAND_MIN - 1e-6);
         if (p.id > seen) {
           seen = p.id;
-          if (band > 34 * 1.4) giants++; // unmistakably a giant ring
+          // Anything past the max non-giant jitter must be a giant roll.
+          const nonGiantMax = captureBandWidth(p.id) * earlyRingBoost(p.id) * RING_JITTER_MAX;
+          if (band > nonGiantMax + 1e-6) giants++;
         }
       }
     }
     expect(bands.size).toBeGreaterThan(10); // genuinely varied, not quantized
     expect(giants).toBeGreaterThan(0); // the occasional big one exists
+  });
+
+  test('the chain sweeps side to side, not a near-vertical ladder', () => {
+    for (const seed of [3, 21, 777]) {
+      const s = createInitialState(WIDTH, HEIGHT, seed);
+      const xById = new Map<number, number>();
+      for (const p of s.planets) xById.set(p.id, p.center.x);
+      for (let i = 0; i < 100; i++) {
+        s.cameraY -= 400;
+        updatePlanetWindow(s);
+        for (const p of s.planets) xById.set(p.id, p.center.x);
+      }
+
+      const mid = WIDTH / 2;
+      let pairs = 0;
+      let crossings = 0;
+      let bigSwings = 0;
+      for (let id = 0; xById.has(id) && xById.has(id + 1); id++) {
+        const a = xById.get(id)!;
+        const b = xById.get(id + 1)!;
+        pairs++;
+        if ((a - mid) * (b - mid) < 0) crossings++;
+        if (Math.abs(b - a) > WIDTH * 0.3) bigSwings++;
+      }
+
+      expect(pairs).toBeGreaterThan(100);
+      // A healthy share of hops lands on the other half of the screen...
+      expect(crossings / pairs).toBeGreaterThanOrEqual(0.25);
+      // ...and genuinely long side-to-side swings actually occur.
+      expect(bigSwings / pairs).toBeGreaterThanOrEqual(0.05);
+    }
   });
 
   test('pruning drops planets far below but never the current one', () => {

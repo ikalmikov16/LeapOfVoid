@@ -68,10 +68,14 @@ export const MAX_PLANETS = 30;
 
 export const ZONE_SIZE = 20;
 
-/** Capture band width (ring minus body): the main difficulty dial. */
-export const BAND_START = 38;
-export const BAND_MIN = 14;
-export const BAND_SHRINK_PER_PLANET = 0.18;
+/**
+ * Capture band width (ring minus body). Kept generous — jump distance, not
+ * ring size, is the main difficulty dial (thin rings read as unfair; long
+ * jumps read as epic).
+ */
+export const BAND_START = 48;
+export const BAND_MIN = 20;
+export const BAND_SHRINK_PER_PLANET = 0.12;
 export const BAND_ZONE_STEP = 1.5;
 /** First planets of a run always get the widest band (fair start for clips). */
 export const FAIR_START_PLANETS = 5;
@@ -85,24 +89,32 @@ export const PLANET_RADIUS_MAX = 25;
 export const PLANET_RADIUS_GROWTH = 0.06; // px per planet added to both bounds
 export const PLANET_RADIUS_GROWTH_CAP = 6;
 
-export const JUMP_MIN_BASE = 150;
-export const JUMP_MIN_GROWTH = 0.7;
-export const JUMP_MIN_CAP = 40;
-export const JUMP_MAX_BASE = 210;
-export const JUMP_MAX_GROWTH = 1.5;
-export const JUMP_MAX_CAP = 90;
+// Jump distance is the main difficulty curve: late-game jumps stretch to
+// ~450px (about half a screen) while rings stay timeable.
+export const JUMP_MIN_BASE = 190;
+export const JUMP_MIN_GROWTH = 1.0;
+export const JUMP_MIN_CAP = 70;
+export const JUMP_MAX_BASE = 270;
+export const JUMP_MAX_GROWTH = 2.5;
+export const JUMP_MAX_CAP = 180;
 
 /** Half-angle (rad) of the placement cone around straight-up. */
-export const CONE_HALF_BASE = 0.35;
-export const CONE_HALF_GROWTH = 0.008;
-export const CONE_HALF_CAP = 0.4; // additional widening, so max ≈ 0.75 rad
+export const CONE_HALF_BASE = 0.85;
+export const CONE_HALF_GROWTH = 0.006;
+export const CONE_HALF_CAP = 0.25; // additional widening, so max ≈ 1.1 rad
+/**
+ * Chance a placement deliberately aims at the half of the screen the current
+ * planet is NOT on, using the outer part of the cone — guarantees the chain
+ * regularly sweeps side to side instead of leaving it to dice.
+ */
+export const SWING_CHANCE = 0.3;
 
 // Ring variety: per-planet seeded jitter on the band, so rings visibly vary
 // and small planets can carry bigger orbits than big ones.
 export const RING_JITTER_MIN = 0.85;
 export const RING_JITTER_MAX = 1.25;
 /** Early orbits are this much bigger on average, easing back to 1×. */
-export const EARLY_RING_BOOST = 1.3;
+export const EARLY_RING_BOOST = 1.15;
 /** ...by this many planets in. */
 export const EARLY_RING_BOOST_PLANETS = 12;
 /** The occasional big one. */

@@ -16,6 +16,7 @@ import {
   RING_JITTER_MAX,
   RING_JITTER_MIN,
   SCREEN_X_MARGIN,
+  SWING_CHANCE,
 } from './constants';
 import {
   captureBandWidth,
@@ -102,7 +103,18 @@ export function generateNextPlanet(state: GameState, planets: Planet[]): Planet 
 
   for (let attempt = 0; attempt < MAX_PLACEMENT_ATTEMPTS; attempt++) {
     const dist = randRange(state, jumpMin(n), jumpMax(n));
-    const theta = -Math.PI / 2 + (rand01(state) * 2 - 1) * coneHalfAngle(n);
+    const cone = coneHalfAngle(n);
+    // theta = -π/2 + offset, and cos(-π/2 + o) = sin(o): a positive offset
+    // moves the placement right. Swing attempts commit to the far half of the
+    // screen using the outer part of the cone; the rest sample uniformly.
+    let offset: number;
+    if (rand01(state) < SWING_CHANCE) {
+      const sign = prev.center.x >= state.width * 0.5 ? -1 : 1;
+      offset = sign * randRange(state, cone * 0.5, cone);
+    } else {
+      offset = (rand01(state) * 2 - 1) * cone;
+    }
+    const theta = -Math.PI / 2 + offset;
     const x = Math.min(Math.max(prev.center.x + Math.cos(theta) * dist, xMin), xMax);
     const center = { x, y: prev.center.y + Math.sin(theta) * dist };
     // Clamping x can compress the jump; re-check the real distance.
