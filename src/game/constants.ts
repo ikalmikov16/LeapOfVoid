@@ -47,7 +47,7 @@ export const PERFECT_BAND_FRACTION = 0.15;
 // --- Capture latch-on (smooth settle instead of snapping to the ring) ---
 
 /** Seconds for the orbit radius to glide from the capture point to the ring. */
-export const CAPTURE_SETTLE_S = 0.8;
+export const CAPTURE_SETTLE_S = 0.7;
 /**
  * Seconds for the angular speed to calm from the capture whip down to orbit
  * speed. Deliberately much shorter than the radius glide: the tangent (the
