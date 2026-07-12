@@ -13,7 +13,6 @@ import type { DeathCause, GameState, Phase, Planet } from '../game/types';
 import { GameCanvas } from '../rendering/GameCanvas';
 
 const DEATH_MESSAGES: Record<DeathCause, string> = {
-  crash: 'SMACKED THE SURFACE',
   lost: 'LOST IN THE VOID',
   burned: 'BURNED UP IN ORBIT',
 };

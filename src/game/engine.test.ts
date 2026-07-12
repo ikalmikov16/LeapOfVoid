@@ -114,14 +114,24 @@ describe('flight resolution', () => {
     expect(above.direction).toBe(1);
   });
 
-  test('path through the planet body crashes at the surface', () => {
+  test('direct body hit still captures into orbit at the impact angle', () => {
     const s = makeState([planet], { ballPos: { x: 0, y: 405 }, velocity: { x: 520, y: 0 } });
     runUntilSettled(s);
-    expect(s.phase).toBe('dead');
-    expect(s.deathCause).toBe('crash');
+    expect(s.phase).toBe('orbiting');
+    expect(s.score).toBe(1);
+    expect(s.currentPlanetId).toBe(0);
+    // Snapped out to the ring, on the side the ball came from.
     const dx = s.ballPos.x - planet.center.x;
     const dy = s.ballPos.y - planet.center.y;
-    expect(Math.hypot(dx, dy)).toBeCloseTo(planet.radius, 0);
+    expect(Math.hypot(dx, dy)).toBeCloseTo(planet.ringRadius);
+    expect(s.ballPos.x).toBeLessThan(planet.center.x);
+  });
+
+  test('perfectly head-on hit through the center captures too', () => {
+    const s = makeState([planet], { ballPos: { x: 0, y: 400 }, velocity: { x: 520, y: 0 } });
+    runUntilSettled(s);
+    expect(s.phase).toBe('orbiting');
+    expect(s.score).toBe(1);
   });
 
   test('path beyond the band sails past and dies off the viewport', () => {

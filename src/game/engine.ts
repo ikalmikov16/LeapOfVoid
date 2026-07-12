@@ -26,7 +26,7 @@ import { captureBandWidth, orbitAngularSpeed, orbitDecayRate, planetRadius } fro
 import { updatePlanetWindow } from './generation';
 import { closestApproachOnSegment, pointOnCircle, segmentCircleEntry } from './geometry';
 import { rand01 } from './rng';
-import type { GameState, Planet, Vec2 } from './types';
+import type { DeathCause, GameState, Planet, Vec2 } from './types';
 
 export function findPlanet(planets: Planet[], id: number): Planet | null {
   'worklet';
@@ -87,7 +87,7 @@ function release(state: GameState): void {
   state.phase = 'flying';
 }
 
-function die(state: GameState, cause: 'crash' | 'lost' | 'burned'): void {
+function die(state: GameState, cause: DeathCause): void {
   'worklet';
   state.phase = 'dead';
   state.deathCause = cause;
@@ -132,9 +132,11 @@ function capture(state: GameState, planet: Planet, point: Vec2): void {
   state.score += 1;
 }
 
-type FlightEvent =
-  | { kind: 'crash'; t: number; planet: Planet }
-  | { kind: 'capture'; t: number; planet: Planet; point: Vec2 };
+interface CaptureEvent {
+  t: number;
+  planet: Planet;
+  point: Vec2;
+}
 
 function stepFlight(state: GameState, dt: number): void {
   'worklet';
@@ -144,20 +146,27 @@ function stepFlight(state: GameState, dt: number): void {
     y: from.y + state.velocity.y * dt,
   };
 
-  // Earliest event along this frame's segment wins.
-  let event: FlightEvent | null = null;
+  // Earliest capture along this frame's segment wins.
+  let event: CaptureEvent | null = null;
   for (let i = 0; i < state.planets.length; i++) {
     const planet = state.planets[i];
     if (planet.id === state.departedPlanetId) continue;
 
-    // Closest approach inside the body = crash (checked as circle entry so the
-    // ball dies at the surface, not past it).
+    // Direct body hit still captures: the ball rides up onto the ring from
+    // the surface impact point (no crash deaths — only lost and burned).
     const entryT = segmentCircleEntry(from, to, planet.center, planet.radius);
     if (entryT !== null && (event === null || entryT < event.t)) {
-      event = { kind: 'crash', t: entryT, planet };
+      event = {
+        t: entryT,
+        planet,
+        point: {
+          x: from.x + (to.x - from.x) * entryT,
+          y: from.y + (to.y - from.y) * entryT,
+        },
+      };
     }
 
-    // Capture: the path's closest approach falls inside the capture band.
+    // Graze capture: the path's closest approach falls inside the capture band.
     // approach.t < 1 means the minimum is passed within this frame's segment;
     // while still approaching (t clamps to 1) we wait for a later frame.
     const approach = closestApproachOnSegment(from, to, planet.center);
@@ -167,7 +176,7 @@ function stepFlight(state: GameState, dt: number): void {
       approach.distance <= planet.ringRadius &&
       (event === null || approach.t < event.t)
     ) {
-      event = { kind: 'capture', t: approach.t, planet, point: approach.point };
+      event = { t: approach.t, planet, point: approach.point };
     }
   }
 
@@ -181,15 +190,6 @@ function stepFlight(state: GameState, dt: number): void {
     if (to.x < -m || to.x > state.width + m || to.y > bottomBound || to.y < topBound) {
       die(state, 'lost');
     }
-    return;
-  }
-
-  if (event.kind === 'crash') {
-    state.ballPos = {
-      x: from.x + (to.x - from.x) * event.t,
-      y: from.y + (to.y - from.y) * event.t,
-    };
-    die(state, 'crash');
     return;
   }
 

@@ -39,7 +39,9 @@ inside the UI-thread frame callback aborts the process).
 Capture is decided by **closest approach** of the ball's straight flight line to a
 planet center (point-to-line distance):
 
-- closest approach < planet radius → crash (death)
+- path enters the planet body → capture at the surface impact point (+1).
+  *No crash deaths (changed from the original design doc at the user's request);
+  the only deaths are lost-in-space and orbit-decay burn-up.*
 - planet radius ≤ closest approach ≤ ring radius → capture into orbit (+1)
 - beyond ring radius → sails past; off-screen with no capture → lost (death)
 

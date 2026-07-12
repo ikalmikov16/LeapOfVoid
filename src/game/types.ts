@@ -7,7 +7,7 @@ export interface Planet {
   /** Ordinal in the infinite chain; strictly increasing, never reused. */
   id: number;
   center: Vec2;
-  /** Planet body radius — closest approach inside this = crash. */
+  /** Planet body radius — a flight path entering this captures at the surface. */
   radius: number;
   /** Orbit ring radius — outer edge of the capture band. */
   ringRadius: number;
@@ -16,7 +16,8 @@ export interface Planet {
 
 export type Phase = 'orbiting' | 'flying' | 'dead';
 
-export type DeathCause = 'crash' | 'lost' | 'burned';
+// 'crash' retired for now: direct body hits capture instead of killing.
+export type DeathCause = 'lost' | 'burned';
 
 /** 1 = angle increasing, -1 = angle decreasing. */
 export type OrbitDirection = 1 | -1;
