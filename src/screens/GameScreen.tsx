@@ -34,6 +34,7 @@ export function GameScreen() {
   const [uiCombo, setUiCombo] = useState(0);
   const [uiPhase, setUiPhase] = useState<Phase>('orbiting');
   const [uiDeathCause, setUiDeathCause] = useState<DeathCause | null>(null);
+  const [uiPlanets, setUiPlanets] = useState(0);
   const [isNewBest, setIsNewBest] = useState(false);
   const [zoneFlash, setZoneFlash] = useState<string | null>(null);
   const zoneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -65,9 +66,10 @@ export function GameScreen() {
     sfxCapture(kind, comboLinks);
     hapticCapture(kind);
   };
-  const onDeath = (score: number) => {
+  const onDeath = (score: number, planetsPassed: number) => {
     sfxDeath();
     hapticDeath();
+    setUiPlanets(planetsPassed);
     setIsNewBest(useAppStore.getState().submitScore(score));
   };
   const onZone = (zoneIndex: number) => {
@@ -120,7 +122,9 @@ export function GameScreen() {
         runOnJS(setUiPhase)(phase);
         if (phase === 'dead') {
           runOnJS(setUiDeathCause)(gameState.value.deathCause);
-          if (prev !== null) runOnJS(onDeath)(gameState.value.score);
+          if (prev !== null) {
+            runOnJS(onDeath)(gameState.value.score, gameState.value.planetsPassed);
+          }
         }
       }
     },
@@ -197,6 +201,9 @@ export function GameScreen() {
               ) : (
                 <Text style={styles.bestLine}>BEST {bestScore}</Text>
               )}
+              <Text style={styles.planetsLine}>
+                {uiPlanets} {uiPlanets === 1 ? 'PLANET' : 'PLANETS'}
+              </Text>
               {/* Reserved for the post-launch rewarded "continue" button. */}
               <View style={styles.continueSlot} />
               <Text style={styles.retry}>tap to try again</Text>
@@ -304,6 +311,14 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     letterSpacing: 3,
+    fontVariant: ['tabular-nums'],
+  },
+  planetsLine: {
+    color: 'rgba(255,255,255,0.35)',
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 3,
+    marginTop: 8,
     fontVariant: ['tabular-nums'],
   },
   continueSlot: {
