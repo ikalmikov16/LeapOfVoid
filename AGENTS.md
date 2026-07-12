@@ -18,13 +18,15 @@ This repo uses **bun** (lockfile: `bun.lock`) — never npm/yarn/pnpm.
 
 ## Stack
 
-Expo SDK 57 / RN 0.86 / React 19 / TypeScript strict. Rendering:
+Expo SDK 54 / RN 0.81 / React 19 / TypeScript strict — **pinned to SDK 54** because
+that's what the App Store build of Expo Go supports (see expo-conventions rule).
+Rendering:
 `@shopify/react-native-skia` (one canvas). Frame loop: `react-native-reanimated`
 `useFrameCallback`. App state: zustand. Persistence: AsyncStorage.
 `expo-haptics`, `expo-audio`. No physics engine — pure circle/line geometry.
 
 Expo APIs change between SDK versions: verify against
-https://docs.expo.dev/versions/v57.0.0/ instead of trusting memory.
+https://docs.expo.dev/versions/v54.0.0/ instead of trusting memory.
 Install native deps with `bunx expo install`, not bare `bun add`.
 
 ## Structure

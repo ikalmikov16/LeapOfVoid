@@ -6,9 +6,13 @@ alwaysApply: false
 
 # Expo / RN Conventions
 
-- This is **Expo SDK 57** (React Native 0.86, React 19). APIs have changed across
-  SDK versions — when unsure, check https://docs.expo.dev/versions/v57.0.0/ rather
+- This is **Expo SDK 54** (React Native 0.81, React 19). APIs have changed across
+  SDK versions — when unsure, check https://docs.expo.dev/versions/v54.0.0/ rather
   than trusting memory.
+- **Deliberately pinned to SDK 54 — do not upgrade.** The App Store version of
+  Expo Go only supports SDK 54 (newer Expo Go builds are stuck in Apple review,
+  as of mid-2026), and the user tests on a physical iPhone via Expo Go. Revisit
+  only when Expo Go updates or we switch to a dev build.
 - Package manager is **bun** (`bun.lock`). Add native/Expo dependencies with
   `bunx expo install <pkg>` (never bare `bun add`) so versions match the SDK.
   Pure-JS libs (zustand) via `bun add` are fine.
