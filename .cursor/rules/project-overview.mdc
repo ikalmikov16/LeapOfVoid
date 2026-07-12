@@ -1,0 +1,40 @@
+---
+description: What Leap of Void is, settled decisions, and scope guardrails
+alwaysApply: true
+---
+
+# Leap of Void — Project Overview
+
+One-touch endless mobile game: a ball orbits a planet, tap to release along the
+orbit tangent, graze the next planet to get captured into its orbit. Chain hops
+forever, score-based, deaths are dramatic. iOS first via Expo/EAS, Android later.
+
+**`orbit-game-plan.md` at the repo root is the design source of truth.** All core
+decisions there are settled — do not re-litigate them. If a task seems to require
+changing a settled decision, ask the user first.
+
+## Non-negotiable constraints
+
+- **Portrait, locked, designed for 9:16.** Every visual must read in a tiny muted
+  vertical TikTok clip. "Does this make a better 5–15 second clip?" is the design test.
+- **One-touch input only.** Single tap anywhere = release. No gestures, no buttons in gameplay.
+- **No physics engine.** Everything is circle math + line geometry. Deterministic, tunable.
+- **Instant play.** No tutorial, no sign-up, restart in under 1 second after death.
+- **Ship fast.** Prefer the simplest implementation that feels good. Polish comes in
+  the dedicated juice pass (Milestone 3), not opportunistically.
+
+## Scope guard — do NOT build (v2 parking lot)
+
+Orbit-radius-from-graze-distance, black hole chase, skins/trails, daily challenge,
+leaderboards, ads code. Death flow should leave room for a future "continue" slot,
+but no ad SDK in v1.
+
+## Roadmap position
+
+Track milestone progress here as milestones complete:
+
+- [ ] M1: Core loop prototype (static planet chain, orbit, tap-release, capture/crash/miss, death, restart, score)
+- [ ] M2: Procedural generation, camera follow, difficulty dials, orbit decay
+- [ ] M3: Juice pass (trail, particles, shake, haptics, SFX, combo/graze/perfect, zones)
+- [ ] M4: Meta screens (home, death card, settings, best-score persistence)
+- [ ] M5: Ship (icon, branding, EAS build, TestFlight, App Store)

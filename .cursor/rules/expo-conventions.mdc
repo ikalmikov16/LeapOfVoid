@@ -1,0 +1,18 @@
+---
+description: Expo / React Native conventions for this repo
+globs: **/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Expo / RN Conventions
+
+- This is **Expo SDK 57** (React Native 0.86, React 19). APIs have changed across
+  SDK versions — when unsure, check https://docs.expo.dev/versions/v57.0.0/ rather
+  than trusting memory.
+- Add native/Expo dependencies with `npx expo install <pkg>` (never bare
+  `npm install`) so versions match the SDK. Pure-JS libs (zustand) via npm are fine.
+- TypeScript strict mode is on; keep it clean. Run `npm run typecheck` after changes.
+- Audio: `expo-audio` (not the removed `expo-av`). Haptics: `expo-haptics`.
+  Persistence: `@react-native-async-storage/async-storage`.
+- Test on a real device via Expo Go / dev build early — animation feel and haptics
+  cannot be judged in a simulator.

@@ -1,0 +1,43 @@
+---
+description: Architecture and performance rules for game code
+globs: src/**
+alwaysApply: false
+---
+
+# Game Architecture
+
+## Layering — keep logic pure
+
+- `src/game/` — pure TypeScript game logic. **No React, no Skia, no Reanimated
+  imports here.** Plain data + pure functions so the simulation is testable and
+  deterministic.
+- `src/rendering/` — Skia components that draw the game state. The whole game
+  renders on **one Skia `<Canvas>`**.
+- `src/screens/` — React screens (Game, Home, Death overlay).
+- `src/state/` — zustand stores for app-level state only (screen, settings,
+  best score). **Never put per-frame game state in zustand or React state.**
+
+## The frame loop
+
+- Drive the simulation with a Reanimated `useFrameCallback`; step the game model
+  with the frame's delta time, then push results into Skia-readable shared values.
+- No `setState`, no allocation-heavy work, no object churn inside the frame loop.
+  React re-renders happen only on discrete events (death, capture score tick).
+
+## Core geometry (the heart of the game)
+
+Capture is decided by **closest approach** of the ball's straight flight line to a
+planet center (point-to-line distance):
+
+- closest approach < planet radius → crash (death)
+- planet radius ≤ closest approach ≤ ring radius → capture into orbit (+1)
+- beyond ring radius → sails past; off-screen with no capture → lost (death)
+
+On capture: orbit direction follows approach direction; orbit radius snaps to the
+planet's fixed ring (v1). Release velocity is the orbit tangent.
+
+## Tuning
+
+All feel/difficulty numbers (speeds, radii, band widths, decay rates, spacing)
+live in `src/game/constants.ts` as named constants — never inline magic numbers.
+Difficulty dials are pure functions of `planetsPassed`.
