@@ -78,7 +78,7 @@ const planet: Planet = {
   id: 1,
   center: { x: 200, y: 400 },
   radius: 20,
-  ringRadius: 50, // band = 30, center at distance 35, perfect window ±3.75
+  ringRadius: 50, // band = 30, center at distance 35, perfect window ±2.25
   color: '#fff',
 };
 
@@ -252,7 +252,7 @@ describe('scoring', () => {
     expect(s.score).toBe(1 + HEAT_MAX);
   });
 
-  test('camping cools the heat one notch per revolution', () => {
+  test('camping cools the heat one notch per half revolution', () => {
     const s = makeState([planet], {
       phase: 'orbiting',
       currentPlanetId: 1,
@@ -260,18 +260,32 @@ describe('scoring', () => {
       heat: 3,
       ballPos: { x: 250, y: 400 },
     });
-    // One revolution at 2.3 rad/s ≈ 2.73s ≈ 164 frames.
-    for (let i = 0; i < 160; i++) stepGame(s, DT);
-    expect(s.heat).toBe(3); // still inside the first revolution
+    // Half a revolution at 2.3 rad/s ≈ 1.37s ≈ 82 frames.
+    for (let i = 0; i < 78; i++) stepGame(s, DT);
+    expect(s.heat).toBe(3); // still inside the first half revolution
     for (let i = 0; i < 10; i++) stepGame(s, DT);
-    expect(s.heat).toBe(2); // crossed 1 revolution
-    for (let i = 0; i < 170; i++) stepGame(s, DT);
-    expect(s.heat).toBe(1); // crossed 2 revolutions
+    expect(s.heat).toBe(2); // crossed 0.5 revolutions
+    for (let i = 0; i < 82; i++) stepGame(s, DT);
+    expect(s.heat).toBe(1); // crossed 1.0 revolutions
+    for (let i = 0; i < 82; i++) stepGame(s, DT);
+    expect(s.heat).toBe(0); // crossed 1.5 revolutions
     expect(s.phase).toBe('orbiting');
   });
 
+  test('landing without a skip cools one notch (after paying out)', () => {
+    const s = makeState([planet], {
+      ballPos: { x: 0, y: 440 },
+      velocity: { x: 520, y: 0 },
+      heat: 3,
+    });
+    runUntilSettled(s);
+    expect(s.phase).toBe('orbiting');
+    expect(s.score).toBe(1 * 4); // cashed at the heat you arrived with...
+    expect(s.heat).toBe(2); // ...then a skipless landing cools you
+  });
+
   test('skimming the surface earns the graze bonus', () => {
-    // Approach 24 → 4px above the surface (GRAZE_MARGIN 8), below perfect window.
+    // Approach 24 → 4px above the surface (GRAZE_MARGIN 5), below perfect window.
     const s = makeState([planet], { ballPos: { x: 0, y: 424 }, velocity: { x: 520, y: 0 } });
     runUntilSettled(s);
     expect(s.phase).toBe('orbiting');

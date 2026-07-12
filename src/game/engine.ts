@@ -236,6 +236,13 @@ function capture(state: GameState, planet: Planet, point: Vec2, approachDistance
     }
   }
 
+  // Heat is momentum: a landing that flew past nothing cools one notch
+  // (after paying out — you cash the multiplier you arrived with). Holding
+  // red-hot means skipping on nearly every hop, not coasting on old glory.
+  if (state.flightSkips === 0 && state.heat > 0) {
+    state.heat -= 1;
+  }
+
   // Effect stamps (hash instead of consuming rngState — generation stays
   // deterministic regardless of how captures interleave).
   state.lastCaptureAt = state.time;

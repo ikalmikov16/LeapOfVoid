@@ -41,9 +41,13 @@ trail intensity, and the score math are all one variable.
    perfect +2, graze +1. `SKIP_POINTS` and the quick-streak multiplier are
    deleted — skips pay through heat, quicks are the flat "extra point".
    Captures at/below the high-water mark still score zero (no farming).
-4. **Cooling: −1 heat per full revolution orbited.** Skips build the state,
-   hesitation drains it (decay pressure already discourages camping; this
-   aligns score pressure with it). Death resets naturally with the run.
+4. **Cooling: heat is momentum.** −1 per *half* revolution orbited, and −1
+   on any landing that skipped nothing (after the payout — you cash the
+   multiplier you arrived with). Holding ×5 requires skipping on nearly
+   every hop; coasting or camping bleeds it away. (Tightened from 1
+   revolution/no landing tax after playtest: ×5 was too easy to reach and
+   keep. Quick window also tightened 0.75 → 0.5 rev, perfect band 0.25 →
+   0.15, graze margin 8 → 5.)
 5. **Hierarchy check**: plain hop 1 · quick 2 · quick perfect 4 · same at
    1 heat 8 · at full red ×5 = 20. Skips dominate, quick/perfect are the
    clear second tier, and they compound — the intended "best play".

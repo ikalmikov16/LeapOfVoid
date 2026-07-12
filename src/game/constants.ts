@@ -34,15 +34,15 @@ export const PERFECT_POINTS = 2;
 /** Flat bonus for releasing within the quick window. */
 export const QUICK_POINTS = 1;
 /** Release within this fraction of a revolution to earn the quick bonus. */
-export const QUICK_WINDOW_REVOLUTIONS = 0.75;
+export const QUICK_WINDOW_REVOLUTIONS = 0.5;
 /** Heat cap: +1 per planet flown past, so the multiplier tops out at ×5. */
 export const HEAT_MAX = 4;
 /** Camping cools: lose 1 heat per this many revolutions orbited. */
-export const HEAT_COOL_REVOLUTIONS = 1;
+export const HEAT_COOL_REVOLUTIONS = 0.5;
 /** Closest approach within this of the surface = graze (nearly died). */
-export const GRAZE_MARGIN = 8;
+export const GRAZE_MARGIN = 5;
 /** Middle fraction of the capture band that counts as a perfect capture. */
-export const PERFECT_BAND_FRACTION = 0.25;
+export const PERFECT_BAND_FRACTION = 0.15;
 
 // --- Capture latch-on (smooth settle instead of snapping to the ring) ---
 
