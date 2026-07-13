@@ -20,8 +20,8 @@ gameplay, privacy labels, policy/support URLs) submitted for review.
 - `app.json` ship config: `ios.bundleIdentifier`, `buildNumber`,
   `ITSAppUsesNonExemptEncryption: false`.
 - `eas.json` with development / preview / production profiles.
-- Privacy policy + support page (hosted via GitHub Pages on the existing
-  `ikalmikov16/LeapOfVoid` repo).
+- Privacy policy + support page (hosted via a small public repo
+  `ikalmikov16/leap-of-void-legal` on GitHub Pages; main game repo stays private).
 - TestFlight round: production build on device — doubles as the deferred
   on-device verification pass for the earlier plans.
 - App Store listing: screenshots (9:16 gameplay captures), description,
@@ -53,7 +53,8 @@ gameplay, privacy labels, policy/support URLs) submitted for review.
   Apple portal; `eas build` generates and stores them.
 - **Privacy posture: "Data Not Collected".** No accounts, no analytics, no
   ads, no tracking; only local AsyncStorage (best score, settings). Apple
-  still requires privacy-policy and support URLs → GitHub Pages `docs/` site.
+  still requires privacy-policy and support URLs → GitHub Pages on the public
+  `leap-of-void-legal` repo.
 
 ## 4. Implementation steps
 
@@ -65,7 +66,8 @@ gameplay, privacy labels, policy/support URLs) submitted for review.
 3. **Ship config** — bundle ID, `buildNumber: "1"`, export-compliance key;
    create `eas.json`. Touches: `app.json`, `eas.json`. _(agent)_
 4. **Privacy/support pages** — `docs/index.html` (support) +
-   `docs/privacy.html`; user enables GitHub Pages for `/docs`. _(agent + user)_
+   `docs/privacy.html` in the main repo (source of truth); mirrored to the
+   public `leap-of-void-legal` repo for GitHub Pages. _(agent + user)_
 5. **EAS + Apple** — `eas login`, `eas init`, `eas build -p ios`,
    `eas submit -p ios` (auto-creates the App Store Connect record).
    _(user in terminal, agent guiding)_
