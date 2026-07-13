@@ -5,14 +5,17 @@ import {
   DashPathEffect,
   Group,
   Line,
-  LinearGradient,
+  matchFont,
   Points,
   Rect,
+  Shader,
+  Text,
   vec,
   type SkPoint,
 } from '@shopify/react-native-skia';
 import { useMemo } from 'react';
-import { interpolateColor, useDerivedValue, type SharedValue } from 'react-native-reanimated';
+import { Platform } from 'react-native';
+import { useDerivedValue, type SharedValue } from 'react-native-reanimated';
 import {
   AIM_LINE_LENGTH,
   AIM_LINE_OPACITY,
@@ -22,6 +25,9 @@ import {
   FLASH_DURATION_S,
   FLYBY_PULSE_S,
   HEAT_COLORS,
+  MILESTONE_INTERVAL,
+  MILESTONE_LABEL_OPACITY,
+  MILESTONE_LINE_OPACITY,
   RELEASE_STRETCH_AMOUNT,
   RELEASE_STRETCH_S,
   SHAKE_AMPLITUDE,
@@ -30,8 +36,9 @@ import {
 } from '../game/constants';
 import { findPlanet } from '../game/engine';
 import type { GameState, Planet } from '../game/types';
+import { BG_SHADER } from './bgShader';
 import { CaptureBurst, DeathShatter, PerfectPulse, Trail } from './effects';
-import { zonePalette } from './zones';
+import { zonePaletteRgb } from './zones';
 
 interface GameCanvasProps {
   width: number;
@@ -50,6 +57,42 @@ function mulberry32(seed: number): () => number {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+const milestoneFont = matchFont({
+  fontFamily: Platform.select({ ios: 'Helvetica Neue', default: 'sans-serif' }),
+  fontSize: 13,
+  fontWeight: 'bold',
+});
+
+/**
+ * Numbered altitude line at every MILESTONE_INTERVAL-th planet — spatial
+ * progress the player climbs past (planet ids are chain ordinals). Static
+ * world-space geometry; the world transform carries it with the camera.
+ */
+function MilestoneMarker({ planet, width }: { planet: Planet; width: number }) {
+  const y = planet.center.y;
+  return (
+    <Group>
+      <Line
+        p1={vec(0, y)}
+        p2={vec(width, y)}
+        color={COLORS.starBright}
+        strokeWidth={1}
+        opacity={MILESTONE_LINE_OPACITY}
+      >
+        <DashPathEffect intervals={[6, 9]} />
+      </Line>
+      <Text
+        x={10}
+        y={y - 7}
+        text={String(planet.id)}
+        font={milestoneFont}
+        color={COLORS.starBright}
+        opacity={MILESTONE_LABEL_OPACITY}
+      />
+    </Group>
+  );
 }
 
 function PlanetView({ planet, gameState }: { planet: Planet; gameState: SharedValue<GameState> }) {
@@ -90,18 +133,28 @@ export function GameCanvas({ width, height, planets, gameState }: GameCanvasProp
     return { dim, bright };
   }, [width, height]);
 
-  // Background gradient cross-fades between zone palettes.
-  const bgColors = useDerivedValue(() => {
+  // Background gradient cross-fades between zone palettes. Rendered by the
+  // dithered shader (see bgShader.ts) — numeric channel lerp replaces
+  // interpolateColor since uniforms want [r, g, b] anyway.
+  const bgUniforms = useDerivedValue(() => {
     const s = gameState.value;
-    const cur = zonePalette(s.zoneIndex);
+    const cur = zonePaletteRgb(s.zoneIndex);
     const e = s.time - s.zoneChangedAt;
-    if (s.zoneIndex === 0 || e >= ZONE_FADE_S) return [cur.bgTop, cur.bgBottom];
-    const prev = zonePalette(s.zoneIndex - 1);
+    if (s.zoneIndex === 0 || e >= ZONE_FADE_S) {
+      return { uRes: [width, height], uTop: cur.top, uBottom: cur.bottom };
+    }
+    const prev = zonePaletteRgb(s.zoneIndex - 1);
     const f = Math.max(0, Math.min(e / ZONE_FADE_S, 1));
-    return [
-      interpolateColor(f, [0, 1], [prev.bgTop, cur.bgTop]) as string,
-      interpolateColor(f, [0, 1], [prev.bgBottom, cur.bgBottom]) as string,
+    const lerped = (a: readonly number[], b: readonly number[]) => [
+      a[0] + (b[0] - a[0]) * f,
+      a[1] + (b[1] - a[1]) * f,
+      a[2] + (b[2] - a[2]) * f,
     ];
+    return {
+      uRes: [width, height],
+      uTop: lerped(prev.top, cur.top),
+      uBottom: lerped(prev.bottom, cur.bottom),
+    };
   });
 
   // World translate + death shake (decaying wobble in screen space).
@@ -201,11 +254,16 @@ export function GameCanvas({ width, height, planets, gameState }: GameCanvasProp
   return (
     <Canvas style={{ width, height }}>
       <Rect x={0} y={0} width={width} height={height}>
-        <LinearGradient start={vec(0, 0)} end={vec(0, height)} colors={bgColors} />
+        <Shader source={BG_SHADER} uniforms={bgUniforms} />
       </Rect>
       <Points points={stars.dim} mode="points" color={COLORS.starDim} style="stroke" strokeWidth={1.6} strokeCap="round" opacity={0.5} />
       <Points points={stars.bright} mode="points" color={COLORS.starBright} style="stroke" strokeWidth={2.4} strokeCap="round" opacity={0.8} />
       <Group transform={worldTransform}>
+        {planets
+          .filter((p) => p.id > 0 && p.id % MILESTONE_INTERVAL === 0)
+          .map((planet) => (
+            <MilestoneMarker key={`m${planet.id}`} planet={planet} width={width} />
+          ))}
         {planets.map((planet) => (
           <PlanetView key={planet.id} planet={planet} gameState={gameState} />
         ))}

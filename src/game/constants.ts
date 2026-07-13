@@ -186,6 +186,24 @@ export const ZONE_FLASH_MS = 3000;
 /** Delay before the death overlay fades in, so the shatter reads first. */
 export const DEATH_OVERLAY_DELAY_MS = 350;
 
+// --- Progress markers & pause (UI) ---
+
+/** Every Nth planet carries a numbered altitude line across the screen. */
+export const MILESTONE_INTERVAL = 10;
+export const MILESTONE_LINE_OPACITY = 0.14;
+export const MILESTONE_LABEL_OPACITY = 0.4;
+/** Square top-right corner region (px) where a tap pauses instead of releasing. */
+export const PAUSE_HOTSPOT_PX = 88;
+
+// --- Home → game warp transition ---
+
+/** Home flies past the camera: scale-up + fade-out on tap-to-start. */
+export const WARP_OUT_MS = 450;
+export const WARP_OUT_SCALE = 2.5;
+/** Game arrives decelerating: scale-in + fade-in on mount. */
+export const WARP_IN_MS = 350;
+export const WARP_IN_SCALE = 0.92;
+
 // --- Look ---
 
 export const PLANET_COLORS: readonly string[] = [

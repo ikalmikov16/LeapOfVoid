@@ -1,6 +1,8 @@
 // Zone flavor: background palettes + names, cycled every ZONE_SIZE planets.
 // Names are placeholders — rename freely, nothing else references them.
 
+import { hexToRgb01 } from './bgShader';
+
 export interface ZonePalette {
   name: string;
   bgTop: string;
@@ -19,4 +21,20 @@ export const ZONES: readonly ZonePalette[] = [
 export function zonePalette(zoneIndex: number): ZonePalette {
   'worklet';
   return ZONES[zoneIndex % ZONES.length];
+}
+
+export interface ZonePaletteRgb {
+  top: [number, number, number];
+  bottom: [number, number, number];
+}
+
+/** Shader-ready palettes, precomputed once at load (plain JS, not a worklet). */
+const ZONES_RGB: readonly ZonePaletteRgb[] = ZONES.map((z) => ({
+  top: hexToRgb01(z.bgTop),
+  bottom: hexToRgb01(z.bgBottom),
+}));
+
+export function zonePaletteRgb(zoneIndex: number): ZonePaletteRgb {
+  'worklet';
+  return ZONES_RGB[zoneIndex % ZONES_RGB.length];
 }

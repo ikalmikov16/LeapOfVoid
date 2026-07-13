@@ -2,6 +2,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { startAmbient } from './src/audio/ambient';
 import { initAudio } from './src/audio/sfx';
 import { GameScreen } from './src/screens/GameScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
@@ -11,8 +12,8 @@ export default function App() {
   const screen = useAppStore((s) => s.screen);
 
   useEffect(() => {
-    hydrateAppStore();
-    initAudio();
+    // The drone must wait for hydration (persisted mute) and the audio mode.
+    Promise.all([hydrateAppStore(), initAudio()]).then(startAmbient);
   }, []);
 
   return (

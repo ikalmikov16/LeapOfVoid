@@ -1,14 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, Share, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { AppState, Pressable, Share, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
+  Easing,
   FadeIn,
   FadeOut,
   runOnJS,
   useAnimatedReaction,
+  useAnimatedStyle,
   useFrameCallback,
   useSharedValue,
+  withTiming,
 } from 'react-native-reanimated';
+import { setBurnHeat } from '../audio/burn';
 import { sfxCapture, sfxDeath, sfxFlyby, sfxRelease, sfxZone } from '../audio/sfx';
 import {
   hapticCapture,
@@ -21,6 +25,9 @@ import {
   DEATH_OVERLAY_DELAY_MS,
   HEAT_COLORS,
   MAX_FRAME_DT_S,
+  PAUSE_HOTSPOT_PX,
+  WARP_IN_MS,
+  WARP_IN_SCALE,
   ZONE_FLASH_MS,
 } from '../game/constants';
 import { createInitialState, handleTap, stepGame } from '../game/engine';
@@ -28,6 +35,7 @@ import type { CaptureKind, DeathCause, GameState, Phase, Planet } from '../game/
 import { GameCanvas } from '../rendering/GameCanvas';
 import { zonePalette } from '../rendering/zones';
 import { useAppStore } from '../state/appStore';
+import { SettingsPills } from './ui';
 
 const DEATH_MESSAGES: Record<DeathCause, string> = {
   crash: 'SMACKED THE SURFACE',
@@ -39,6 +47,11 @@ export function GameScreen() {
   const { width, height } = useWindowDimensions();
   const initialState = useMemo(() => createInitialState(width, height), [width, height]);
   const gameState = useSharedValue<GameState>(initialState);
+
+  // Pause lives outside GameState: the frame loop just stops stepping, so
+  // the sim stays pure and every time-based visual freezes for free.
+  const paused = useSharedValue(false);
+  const [uiPaused, setUiPaused] = useState(false);
 
   // React-side mirrors, updated only on discrete events (never per frame).
   const [uiScore, setUiScore] = useState(0);
@@ -54,13 +67,27 @@ export function GameScreen() {
 
   const bestScore = useAppStore((s) => s.bestScore);
 
+  // Warp arrival: the screen mounts mid-motion (scale-in + fade) so the
+  // home screen's zoom-out reads as one continuous flight.
+  const warpIn = useSharedValue(0);
+  useEffect(() => {
+    warpIn.value = withTiming(1, { duration: WARP_IN_MS, easing: Easing.out(Easing.quad) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const warpStyle = useAnimatedStyle(() => ({
+    opacity: warpIn.value,
+    transform: [{ scale: WARP_IN_SCALE + (1 - WARP_IN_SCALE) * warpIn.value }],
+  }));
+
   useEffect(() => {
     return () => {
       if (zoneTimer.current !== null) clearTimeout(zoneTimer.current);
+      setBurnHeat(0); // leaving the screen must never strand the burn loop
     };
   }, []);
 
   useFrameCallback((frame) => {
+    if (paused.value) return;
     const dt = Math.min((frame.timeSincePreviousFrame ?? 16.7) / 1000, MAX_FRAME_DT_S);
     // Copy-then-mutate: the engine only replaces top-level fields, and
     // reassigning .value is what notifies Skia's derived values.
@@ -68,6 +95,28 @@ export function GameScreen() {
     stepGame(s, dt);
     gameState.value = s;
   });
+
+  const pauseGame = () => {
+    paused.value = true;
+    setUiPaused(true);
+  };
+  const resumeGame = () => {
+    paused.value = false;
+    setUiPaused(false);
+  };
+
+  // Auto-pause on backgrounding — a run must not die unattended. Reads the
+  // phase from the shared value so the once-registered listener never sees
+  // stale React state.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (appState) => {
+      if (appState === 'active') return;
+      const phase = gameState.value.phase;
+      if (phase === 'orbiting' || phase === 'flying') pauseGame();
+    });
+    return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const onRelease = () => {
     sfxRelease();
@@ -84,8 +133,13 @@ export function GameScreen() {
   const onDeath = (score: number, planetsPassed: number) => {
     sfxDeath();
     hapticDeath();
+    setBurnHeat(0); // the flame dies with the ball, whatever heat says
     setUiPlanets(planetsPassed);
     setIsNewBest(useAppStore.getState().submitScore(score));
+  };
+  const onHeat = (heat: number) => {
+    setUiHeat(heat);
+    setBurnHeat(heat);
   };
   const onZone = (zoneIndex: number) => {
     sfxZone();
@@ -95,12 +149,21 @@ export function GameScreen() {
     zoneTimer.current = setTimeout(() => setZoneFlash(null), ZONE_FLASH_MS);
   };
 
-  // While dead, input belongs to the death card (tap-to-retry surface +
-  // share/home buttons); the global gesture would race the buttons.
+  // Playable tap only — overlays live outside this detector so pause/death
+  // UI can never race the release gesture (Resume used to re-enable the
+  // gesture mid-press and fire a release on the same touch).
   const tap = Gesture.Tap()
-    .enabled(uiPhase !== 'dead')
-    .onBegin(() => {
+    .enabled(uiPhase !== 'dead' && !uiPaused)
+    .onBegin((e) => {
+      // Shared-value guard: React `.enabled` can lag one frame behind pause.
+      if (paused.value) return;
       // onBegin fires on touch-down (not release) — lowest possible input latency.
+      // The one carve-out from tap-anywhere-releases: a small top-right
+      // hotspot pauses instead (checked here so nothing races the release).
+      if (e.x >= width - PAUSE_HOTSPOT_PX && e.y <= PAUSE_HOTSPOT_PX) {
+        runOnJS(pauseGame)();
+        return;
+      }
       gameState.value = { ...handleTap({ ...gameState.value }) };
     });
 
@@ -131,7 +194,7 @@ export function GameScreen() {
   useAnimatedReaction(
     () => gameState.value.heat,
     (heat, prev) => {
-      if (heat !== prev) runOnJS(setUiHeat)(heat);
+      if (heat !== prev) runOnJS(onHeat)(heat);
     },
   );
   useAnimatedReaction(
@@ -188,65 +251,98 @@ export function GameScreen() {
   );
 
   return (
-    <GestureDetector gesture={tap}>
-      <View style={styles.root}>
-        <GameCanvas width={width} height={height} planets={planets} gameState={gameState} />
-        <View style={styles.hud} pointerEvents="none">
-          <Text style={styles.score}>{uiScore}</Text>
-          {uiHeat > 0 && (
-            <Text style={[styles.heatBadge, { color: HEAT_COLORS[uiHeat] }]}>×{1 + uiHeat}</Text>
-          )}
+    <Animated.View style={[styles.root, warpStyle]}>
+      <GestureDetector gesture={tap}>
+        <View style={styles.playSurface}>
+          <GameCanvas width={width} height={height} planets={planets} gameState={gameState} />
         </View>
-        {zoneFlash !== null && (
-          <Animated.View
-            entering={FadeIn.duration(250)}
-            exiting={FadeOut.duration(450)}
-            style={styles.zoneFlashWrap}
-            pointerEvents="none"
-          >
-            <Text style={styles.zoneName}>{zoneFlash}</Text>
-          </Animated.View>
-        )}
-        {uiPhase === 'orbiting' && uiScore === 0 && (
-          <View style={styles.hintWrap} pointerEvents="none">
-            <Text style={styles.hint}>tap to release</Text>
-          </View>
-        )}
-        {uiPhase === 'dead' && (
-          <Animated.View
-            entering={FadeIn.delay(DEATH_OVERLAY_DELAY_MS).duration(300)}
-            exiting={FadeOut.duration(120)}
-            style={styles.deathOverlay}
-          >
-            <Pressable style={styles.deathTapArea} onPress={restartRun}>
-              <Text style={styles.deathCause}>
-                {uiDeathCause !== null ? DEATH_MESSAGES[uiDeathCause] : ''}
-              </Text>
-              <Text style={styles.deathScore}>{uiScore}</Text>
-              {isNewBest ? (
-                <Text style={styles.newBest}>NEW BEST</Text>
-              ) : (
-                <Text style={styles.bestLine}>BEST {bestScore}</Text>
-              )}
-              <Text style={styles.planetsLine}>
-                {uiPlanets} {uiPlanets === 1 ? 'PLANET' : 'PLANETS'}
-              </Text>
-              {/* Reserved for the post-launch rewarded "continue" button. */}
-              <View style={styles.continueSlot} />
-              <Text style={styles.retry}>tap to try again</Text>
-              <View style={styles.deathButtons}>
-                <Pressable style={styles.deathButton} onPress={shareScore} hitSlop={8}>
-                  <Text style={styles.deathButtonText}>SHARE</Text>
-                </Pressable>
-                <Pressable style={styles.deathButton} onPress={goHome} hitSlop={8}>
-                  <Text style={styles.deathButtonText}>HOME</Text>
-                </Pressable>
-              </View>
-            </Pressable>
-          </Animated.View>
+      </GestureDetector>
+      <View style={styles.hud} pointerEvents="none">
+        <Text style={styles.score}>{uiScore}</Text>
+        {uiHeat > 0 && (
+          <Text style={[styles.heatBadge, { color: HEAT_COLORS[uiHeat] }]}>×{1 + uiHeat}</Text>
         )}
       </View>
-    </GestureDetector>
+      {zoneFlash !== null && (
+        <Animated.View
+          entering={FadeIn.duration(250)}
+          exiting={FadeOut.duration(450)}
+          style={styles.zoneFlashWrap}
+          pointerEvents="none"
+        >
+          <Text style={styles.zoneName}>{zoneFlash}</Text>
+        </Animated.View>
+      )}
+      {uiPhase === 'orbiting' && uiScore === 0 && (
+        <View style={styles.hintWrap} pointerEvents="none">
+          <Text style={styles.hint}>TAP TO RELEASE</Text>
+        </View>
+      )}
+      {uiPhase !== 'dead' && !uiPaused && (
+        <View style={styles.pauseGlyph} pointerEvents="none">
+          <Text style={styles.pauseGlyphText}>II</Text>
+        </View>
+      )}
+      {uiPaused && (
+        <Animated.View
+          entering={FadeIn.duration(150)}
+          exiting={FadeOut.duration(120)}
+          style={styles.pauseOverlay}
+        >
+          <Text style={styles.pausedTitle}>PAUSED</Text>
+          <Pressable style={styles.resumeButton} onPress={resumeGame} hitSlop={8}>
+            <Text style={styles.resumeText}>RESUME</Text>
+          </Pressable>
+          <View style={styles.pausePills}>
+            <SettingsPills />
+          </View>
+          <Pressable style={styles.quitButton} onPress={goHome} hitSlop={14}>
+            <Text style={styles.quitText}>HOME</Text>
+          </Pressable>
+        </Animated.View>
+      )}
+      {uiPhase === 'dead' && (
+        <Animated.View
+          entering={FadeIn.delay(DEATH_OVERLAY_DELAY_MS).duration(300)}
+          exiting={FadeOut.duration(120)}
+          style={styles.deathOverlay}
+        >
+          <Pressable style={styles.deathTapArea} onPress={restartRun}>
+            <Text style={styles.deathCause}>
+              {uiDeathCause !== null ? DEATH_MESSAGES[uiDeathCause] : ''}
+            </Text>
+            <Text style={styles.deathScore}>{uiScore}</Text>
+            {isNewBest ? (
+              <Text style={styles.newBest}>NEW BEST</Text>
+            ) : (
+              <Text style={styles.bestLine}>BEST {bestScore}</Text>
+            )}
+            <Text style={styles.planetsLine}>
+              {uiPlanets} {uiPlanets === 1 ? 'PLANET' : 'PLANETS'}
+            </Text>
+            {/* Reserved for the post-launch rewarded "continue" button. */}
+            <View style={styles.continueSlot} />
+            <Text style={styles.retry}>TAP TO TRY AGAIN</Text>
+          </Pressable>
+          {/* Bottom corners — outside reflex spam-tap territory; the whole
+              center above stays retry surface. */}
+          <Pressable
+            style={[styles.cornerButton, styles.cornerLeft]}
+            onPress={shareScore}
+            hitSlop={10}
+          >
+            <Text style={styles.cornerButtonText}>SHARE</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.cornerButton, styles.cornerRight]}
+            onPress={goHome}
+            hitSlop={10}
+          >
+            <Text style={styles.cornerButtonText}>HOME</Text>
+          </Pressable>
+        </Animated.View>
+      )}
+    </Animated.View>
   );
 }
 
@@ -254,6 +350,9 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: '#050510',
+  },
+  playSurface: {
+    ...StyleSheet.absoluteFillObject,
   },
   hud: {
     position: 'absolute',
@@ -355,21 +454,79 @@ const styles = StyleSheet.create({
     fontSize: 15,
     letterSpacing: 2,
   },
-  deathButtons: {
-    flexDirection: 'row',
-    gap: 14,
-    marginTop: 32,
+  pauseGlyph: {
+    position: 'absolute',
+    top: 56,
+    right: 24,
   },
-  deathButton: {
+  pauseGlyphText: {
+    color: 'rgba(255,255,255,0.35)',
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 2,
+  },
+  pauseOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(4,4,16,0.82)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pausedTitle: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 26,
+    fontWeight: '900',
+    letterSpacing: 8,
+  },
+  resumeButton: {
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.28)',
-    borderRadius: 22,
-    paddingHorizontal: 24,
-    paddingVertical: 10,
+    borderColor: 'rgba(255,255,255,0.5)',
+    borderRadius: 26,
+    paddingHorizontal: 40,
+    paddingVertical: 14,
+    marginTop: 36,
   },
-  deathButtonText: {
-    color: 'rgba(255,255,255,0.8)',
+  resumeText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 3,
+  },
+  pausePills: {
+    marginTop: 36,
+  },
+  quitButton: {
+    position: 'absolute',
+    bottom: 52,
+    alignSelf: 'center',
+  },
+  quitText: {
+    color: 'rgba(255,255,255,0.45)',
     fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 4,
+  },
+  cornerButton: {
+    position: 'absolute',
+    bottom: 30,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  cornerLeft: {
+    left: 24,
+  },
+  cornerRight: {
+    right: 24,
+  },
+  cornerButtonText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12,
     fontWeight: '700',
     letterSpacing: 2,
   },
