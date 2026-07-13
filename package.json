@@ -32,7 +32,8 @@
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "lint": "expo lint",
-    "sfx": "bun scripts/generate-sfx.ts"
+    "sfx": "bun scripts/generate-sfx.ts",
+    "icon": "bun scripts/generate-icon.ts"
   },
   "private": true
 }
