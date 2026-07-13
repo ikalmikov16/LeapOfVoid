@@ -31,9 +31,7 @@ const RAMP_UP_TAU_MS = 250;
 const RAMP_DOWN_TAU_MS = 500;
 const RAMP_STEP_MS = 20;
 
-/* eslint-disable @typescript-eslint/no-require-imports */
 const source = require('../../assets/sfx/burn.wav') as number;
-/* eslint-enable @typescript-eslint/no-require-imports */
 const players = [createAudioPlayer(source), createAudioPlayer(source)];
 for (const p of players) {
   p.loop = true;

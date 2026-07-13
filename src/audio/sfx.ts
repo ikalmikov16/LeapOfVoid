@@ -48,7 +48,6 @@ class VoicePool {
   }
 }
 
-/* eslint-disable @typescript-eslint/no-require-imports */
 const releasePool = new VoicePool([require('../../assets/sfx/release.wav')], 2);
 const capturePool = new VoicePool(
   [
@@ -78,7 +77,6 @@ const flybyPool = new VoicePool(
 const perfectPool = new VoicePool([require('../../assets/sfx/perfect.wav')], 1);
 const deathPool = new VoicePool([require('../../assets/sfx/death.wav')], 1);
 const zonePool = new VoicePool([require('../../assets/sfx/zone.wav')], 1);
-/* eslint-enable @typescript-eslint/no-require-imports */
 
 export async function initAudio(): Promise<void> {
   await setAudioModeAsync({
