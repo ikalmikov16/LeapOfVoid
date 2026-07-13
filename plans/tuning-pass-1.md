@@ -16,12 +16,12 @@ visibly varied ring sizes, and a zone change players actually notice.
 
 ### Early-game easing (constants only)
 
-| Dial | Was | Now | Why |
-|---|---|---|---|
-| Orbit speed base | 2.6 rad/s | 2.3 | Release timing window ~13% wider |
-| Planet body radius | 20–28 | 17–25 | Crash zone smaller relative to band |
-| Band start | 34 | 38 | More forgiving early corridor |
-| Band shrink / planet | 0.25 | 0.18 | Slower difficulty ramp |
+| Dial                 | Was       | Now   | Why                                 |
+| -------------------- | --------- | ----- | ----------------------------------- |
+| Orbit speed base     | 2.6 rad/s | 2.3   | Release timing window ~13% wider    |
+| Planet body radius   | 20–28     | 17–25 | Crash zone smaller relative to band |
+| Band start           | 34        | 38    | More forgiving early corridor       |
+| Band shrink / planet | 0.25      | 0.18  | Slower difficulty ramp              |
 
 ### Combo reachability
 
@@ -34,7 +34,7 @@ visibly varied ring sizes, and a zone change players actually notice.
 Planet ids are chain ordinals, so:
 
 - On capture of planet `id > planetsPassed`: `planetsPassed = id` (difficulty
-  and zones now track *altitude*, not capture count), and each skipped planet
+  and zones now track _altitude_, not capture count), and each skipped planet
   pays `SKIP_POINTS = 2` on top of the capture points.
 - Capturing a planet at or below your high-water mark (jumping backward, or
   re-grabbing the start planet) is a safety net worth **zero points** — this
@@ -52,7 +52,7 @@ Per generated planet, the band gets a seeded jitter before building the ring:
 - Placement/corridor validation already uses real ring radii — no other code
   changes.
 - **Follow-up (same pass):** early-game ring boost — bands run ×1.3 at planet
-  0, easing linearly to ×1 by planet 12, applied *under* the jitter. Early
+  0, easing linearly to ×1 by planet 12, applied _under_ the jitter. Early
   orbits are big on average but can still roll small; late ones tight but
   sometimes giant. The start planet always gets the full boost, un-jittered
   (a run should never open on a cramped ring).

@@ -103,7 +103,13 @@ function PlanetView({ planet, gameState }: { planet: Planet; gameState: SharedVa
   );
   return (
     <Group>
-      <Circle cx={planet.center.x} cy={planet.center.y} r={planet.radius * 1.3} color={planet.color} opacity={0.3}>
+      <Circle
+        cx={planet.center.x}
+        cy={planet.center.y}
+        r={planet.radius * 1.3}
+        color={planet.color}
+        opacity={0.3}
+      >
         <BlurMask blur={14} style="normal" />
       </Circle>
       <Circle
@@ -181,9 +187,7 @@ export function GameCanvas({ width, height, planets, gameState }: GameCanvasProp
     () => findPlanet(gameState.value.planets, gameState.value.currentPlanetId)?.center.y ?? 0,
   );
   const orbitR = useDerivedValue(() => Math.max(gameState.value.orbitRadius, 1));
-  const orbitOpacity = useDerivedValue(() =>
-    gameState.value.phase === 'orbiting' ? 0.65 : 0,
-  );
+  const orbitOpacity = useDerivedValue(() => (gameState.value.phase === 'orbiting' ? 0.65 : 0));
 
   // Dashed tangent aim line: where a release right now would send you.
   const aimP1 = useDerivedValue(() => {
@@ -256,8 +260,24 @@ export function GameCanvas({ width, height, planets, gameState }: GameCanvasProp
       <Rect x={0} y={0} width={width} height={height}>
         <Shader source={BG_SHADER} uniforms={bgUniforms} />
       </Rect>
-      <Points points={stars.dim} mode="points" color={COLORS.starDim} style="stroke" strokeWidth={1.6} strokeCap="round" opacity={0.5} />
-      <Points points={stars.bright} mode="points" color={COLORS.starBright} style="stroke" strokeWidth={2.4} strokeCap="round" opacity={0.8} />
+      <Points
+        points={stars.dim}
+        mode="points"
+        color={COLORS.starDim}
+        style="stroke"
+        strokeWidth={1.6}
+        strokeCap="round"
+        opacity={0.5}
+      />
+      <Points
+        points={stars.bright}
+        mode="points"
+        color={COLORS.starBright}
+        style="stroke"
+        strokeWidth={2.4}
+        strokeCap="round"
+        opacity={0.8}
+      />
       <Group transform={worldTransform}>
         {planets
           .filter((p) => p.id > 0 && p.id % MILESTONE_INTERVAL === 0)
@@ -276,7 +296,14 @@ export function GameCanvas({ width, height, planets, gameState }: GameCanvasProp
           color={COLORS.ball}
           opacity={orbitOpacity}
         />
-        <Line p1={aimP1} p2={aimP2} color={COLORS.ball} strokeWidth={2} strokeCap="round" opacity={aimOpacity}>
+        <Line
+          p1={aimP1}
+          p2={aimP2}
+          color={COLORS.ball}
+          strokeWidth={2}
+          strokeCap="round"
+          opacity={aimOpacity}
+        >
           <DashPathEffect intervals={[7, 8]} />
         </Line>
         <PerfectPulse gameState={gameState} />

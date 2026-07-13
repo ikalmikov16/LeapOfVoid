@@ -14,7 +14,7 @@ re-run `bun run sfx`.)
 
 ## 1. Goal
 
-The game sounds *produced*: every SFX has a layered attack/body/air structure
+The game sounds _produced_: every SFX has a layered attack/body/air structure
 with baked-in space (reverb tails fitting the void theme), capture/flyby chains
 play pentatonic melodies as heat rises, rapid retriggers overlap naturally
 instead of cutting each other off, and a barely-audible dark drone glues it all
@@ -35,7 +35,7 @@ no new dependencies, total audio payload under ~2.5 MB.
   mapping, subtle random pitch jitter on non-pitched sounds.
 - Ambient bed: procedurally generated seamless loop, played quietly on home +
   game screens, obeying the existing sound toggle.
-- Burn bed *(added after playtest)*: looping fire/wind texture while the heat
+- Burn bed _(added after playtest)_: looping fire/wind texture while the heat
   multiplier is active, volume/rate stepping with heat level.
 
 **Out (explicitly):**
@@ -54,7 +54,7 @@ no new dependencies, total audio payload under ~2.5 MB.
 
 Synthesized sound fits the game's clean space aesthetic, carries zero licensing
 risk, stays tunable in code, and keeps the binary tiny. The current sounds are
-weak because the *synth is primitive*, not because synthesis is the wrong tool.
+weak because the _synth is primitive_, not because synthesis is the wrong tool.
 Prove out a real synth before reaching for sample libraries.
 
 ### Synthesis engine upgrades (`scripts/generate-sfx.ts`)
@@ -62,7 +62,7 @@ Prove out a real synth before reaching for sample libraries.
 - **44.1 kHz** (up from 22 050) — restores the 8–16 kHz "air" band where
   polish lives. Mono 16-bit WAV stays.
 - **Layer model** — every sound is a mix of up to three roles:
-  *transient* (short click/thump attack), *body* (tonal core), *air*
+  _transient_ (short click/thump attack), _body_ (tonal core), _air_
   (filtered-noise tail). Helpers stay pure `Float32Array → Float32Array`.
 - **Richer tonal bodies** — additive partials with per-partial decay rates,
   slightly detuned oscillator pairs (~±6 cents) for width/movement, and pitch
@@ -83,7 +83,7 @@ Prove out a real synth before reaching for sample libraries.
   the capture playback rate. Chains then play actual melodies; every
   interval sounds intentional. Table lives in `sfx.ts` — it's audio tuning,
   not game feel.
-- *(Revised after playtest)* **Flyby escalates by intensity, not pitch** —
+- _(Revised after playtest)_ **Flyby escalates by intensity, not pitch** —
   pitch-mapping the flyby read as a slide whistle on device. Each successive
   planet skipped in a chain plays the fire rush louder (volume 0.55 → 1.0)
   and slightly faster (rate 1.0 → 1.2). Pitch carries no meaning here, so it
@@ -107,19 +107,19 @@ single players. Total player count stays ~20 — trivial preload cost.
 - **Generated, not sourced** — keeps the zero-licensing pipeline and makes a
   mathematically seamless loop achievable by construction, sidestepping the
   loop-point problem that plagues sourced ambiences.
-- *(Revised after playtest)* The first version was a dark A1 drone — too dark
+- _(Revised after playtest)_ The first version was a dark A1 drone — too dark
   and serious on device. Replaced with a **warm lofi chord pad**: a mellow
   I–vi–IV–V progression in A major (Amaj9 → F#m7 → Dmaj9 → E9sus) on a soft
   EP-style pad (detuned sine pairs + gentle tremolo), sub bass roots, vinyl
   dust crackle, and breathing tape hiss. **No drums**: a beat on a ~32 s loop
   turns grating, imposes a tempo that fights the game's pacing, and synth
-  drums from this engine would sound cheap. If a real lofi *beat* is ever
+  drums from this engine would sound cheap. If a real lofi _beat_ is ever
   wanted, that's a sourcing/licensing task — v2 territory.
-- Seam strategy *(revised after playtest)*: a sample-continuous seam is not
+- Seam strategy _(revised after playtest)_: a sample-continuous seam is not
   enough — `expo-audio`'s `loop` is **not gapless on iOS in SDK 54** (expo
   issue #42880, fixed only in a later SDK), so the restart hiccup is audible
-  no matter how the waveform lines up. The loop is instead authored to *end
-  in a breath*: the final V chord resolves to silence 0.5 s before the loop
+  no matter how the waveform lines up. The loop is instead authored to _end
+  in a breath_: the final V chord resolves to silence 0.5 s before the loop
   point (dust/hiss also reach zero there), and the restart is the I chord
   swelling from silence. The player's gap lands inside an intentional
   musical rest.
@@ -144,7 +144,7 @@ single players. Total player count stays ~20 — trivial preload cost.
 - A constant burning/wind loop plays **whenever heat ≥ 1** — exactly when the
   comet ball stops being white — and steps louder (volume 0.15 → 0.42) and
   slightly faster per heat level, complementing the per-planet flyby pops.
-- Texture *(softened after playtest — first cut was too aggressive)*: warm
+- Texture _(softened after playtest — first cut was too aggressive)_: warm
   rumble + wide airy wind band, embers barely sprinkled, all under a shallow
   slow flicker (`burn.wav`, 6 s, generated).
 - The non-gapless-loop problem can't hide in a musical rest here (the texture
@@ -154,21 +154,21 @@ single players. Total player count stays ~20 — trivial preload cost.
   restart gap falls where its own envelope is silent.
 - Driven from the existing heat reaction in `GameScreen` (which already fires
   on flyby gains, landing cools, and camping decay), with eased volume glides
-  (exponential approach; ~250 ms up, ~500 ms down) because heat *drops* have
+  (exponential approach; ~250 ms up, ~500 ms down) because heat _drops_ have
   no masking one-shot. Death and screen unmount force it to 0. Lives in
   `src/audio/burn.ts`.
 
 ### Per-sound redesign sketches
 
-| Sound | Recipe direction |
-| --- | --- |
-| release | soft "thip": tiny noise transient + down-swooping sine body, dry |
-| capture | warm pluck: pitch-swoop attack, detuned triangle pair body, 3–4 partials, touch of saturation |
-| graze | spark: band-passed noise burst + metallic high partial, short shimmer tail |
-| perfect | chime: two detuned bell tones (inharmonic partials), small reverb bloom |
-| flyby | fire rush: down-swept wide-band noise + ember crackle + low whoomph, all noise, no tone (revised — the original whoosh-tick with a tonal pip read as a slide whistle) |
-| death | two-stage: sub-drop boom + saturated impact noise, long dark reverb tail |
-| zone | swell: slow-attack detuned pad chord blooming into reverb |
+| Sound   | Recipe direction                                                                                                                                                      |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| release | soft "thip": tiny noise transient + down-swooping sine body, dry                                                                                                      |
+| capture | warm pluck: pitch-swoop attack, detuned triangle pair body, 3–4 partials, touch of saturation                                                                         |
+| graze   | spark: band-passed noise burst + metallic high partial, short shimmer tail                                                                                            |
+| perfect | chime: two detuned bell tones (inharmonic partials), small reverb bloom                                                                                               |
+| flyby   | fire rush: down-swept wide-band noise + ember crackle + low whoomph, all noise, no tone (revised — the original whoosh-tick with a tonal pip read as a slide whistle) |
+| death   | two-stage: sub-drop boom + saturated impact noise, long dark reverb tail                                                                                              |
+| zone    | swell: slow-attack detuned pad chord blooming into reverb                                                                                                             |
 
 Exact numbers live in the script as named recipe parameters — they are the
 audio equivalent of `constants.ts` and get tuned during the device pass.
@@ -189,7 +189,7 @@ audio equivalent of `constants.ts` and get tuned during the device pass.
    start at app mount; subscribe to `soundEnabled`. Touches: script,
    `assets/sfx/`, new `ambient.ts`, `App.tsx`.
 5. **Mix + device tuning pass** — balance per-sound gains against each other
-   and the drone on a real phone speaker *and* earbuds; verify stacked events
+   and the drone on a real phone speaker _and_ earbuds; verify stacked events
    (capture+perfect over drone) stay clean.
 
 ## 5. Testing & acceptance criteria

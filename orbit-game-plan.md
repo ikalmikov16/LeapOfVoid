@@ -11,7 +11,7 @@
 ## 1. The Goal (why this project exists)
 
 - Build a **simple, addictive, single-player mobile game** and ship it to the **App Store (iOS first)**.
-- Grow users by posting **short gameplay clips on social media** (TikTok / Reels / Shorts). Every design decision should serve the question: *"does this make a better 5–15 second vertical clip?"*
+- Grow users by posting **short gameplay clips on social media** (TikTok / Reels / Shorts). Every design decision should serve the question: _"does this make a better 5–15 second vertical clip?"_
 - Eventually **monetize with ads** (interstitials between runs + rewarded "continue once" ad). No paywalls, no forced sign-ups, instant play.
 - Strategy: **ship fast, post clips early, iterate** on what performs. Do not polish for months before launch.
 - Android port later (the cross-platform codebase is a deliberate choice for this).
@@ -36,19 +36,21 @@ Think: the timing purity of Flappy Bird + the flow of a swinging/slingshot game,
 ## 3. Core Rules (the settled spec)
 
 ### Orbit & release
+
 - Ball orbits the current planet at constant angular speed on that planet's orbit ring.
 - Single tap (anywhere on screen) = release. Ball departs along the **current tangent line** and flies straight at constant speed.
 - The skill: **time your tap** so the tangent line takes you where you want to go.
 
 ### Capture geometry (important — this was carefully worked out)
+
 When the ball flies toward a planet, compute the **closest-approach distance** of its
 straight-line path to that planet's center:
 
-| Closest approach | Result |
-|---|---|
-| Inside the planet body | **Crash into surface = death** |
-| Within the capture band (between surface and outer ring edge) | **Captured into orbit** (+1 score) |
-| Beyond the capture band | Ball sails past — if nothing else catches it, **lost in space = death** |
+| Closest approach                                              | Result                                                                  |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Inside the planet body                                        | **Crash into surface = death**                                          |
+| Within the capture band (between surface and outer ring edge) | **Captured into orbit** (+1 score)                                      |
+| Beyond the capture band                                       | Ball sails past — if nothing else catches it, **lost in space = death** |
 
 Key insight: the ring surrounds the planet, so if merely crossing the ring captured you,
 hitting a planet would be geometrically impossible and every sloppy shot would succeed.
@@ -60,10 +62,12 @@ overshoot), and the main difficulty dial for free.
 - Orbit radius on capture: **snap to the planet's fixed ring** in v1. (v2 idea: orbit radius = your actual graze distance — tighter graze = faster, riskier orbit with bonus points. Deliberately deferred.)
 
 ### Pressure system (anti-camping — required for an endless score game)
+
 - **Decaying orbits (v1):** every orbit slowly spirals inward; wait too long and you burn up on the planet surface. Visibly telegraphed (orbit tightens). Each planet is a ticking clock.
 - **Black hole (v1.5 / later zones):** chases from below/behind, swallowing planets at increasing speed. Global pace pressure + spectacular on camera. Add after core game works.
 
 ### Death & restart (clip-critical)
+
 - Deaths must be readable and dramatic: impact flash, ball shatters into particles, screen shake, haptic thud.
 - Death screen: **huge score number**, best score, **one-tap instant restart (< 1 second)**, share button.
 - Fair-start rule: first few planets of every run have generous capture bands so no one dies in the opening seconds of a clip.
@@ -108,7 +112,7 @@ Introduce roughly **one new element per zone** so long runs keep escalating and 
 
 ## 8. Roadmap (build order)
 
-1. **Core loop prototype (make-or-break):** one screen, static chain of planets, orbiting ball, tap-release along tangent, closest-approach capture/crash/miss logic, death + instant restart, score counter. *Get the release-and-capture feel right before anything else.*
+1. **Core loop prototype (make-or-break):** one screen, static chain of planets, orbiting ball, tap-release along tangent, closest-approach capture/crash/miss logic, death + instant restart, score counter. _Get the release-and-capture feel right before anything else._
 2. **Procedural generation + difficulty:** infinite planet chain trending upward, camera follow, all difficulty dials as functions of planets-passed, orbit decay.
 3. **Juice pass:** trail, particles, shake, haptics, SFX, combo/graze/perfect systems, zone color shifts.
 4. **Meta:** home screen (tap to start), death card (score/best/share), settings (sound/haptics toggles), best-score persistence.

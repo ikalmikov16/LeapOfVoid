@@ -41,7 +41,7 @@ trail intensity, and the score math are all one variable.
    perfect +2, graze +1. `SKIP_POINTS` and the quick-streak multiplier are
    deleted — skips pay through heat, quicks are the flat "extra point".
    Captures at/below the high-water mark still score zero (no farming).
-4. **Cooling: heat is momentum.** −1 per *half* revolution orbited, and −1
+4. **Cooling: heat is momentum.** −1 per _half_ revolution orbited, and −1
    on any landing that skipped nothing (after the payout — you cash the
    multiplier you arrived with). Holding ×5 requires skipping on nearly
    every hop; coasting or camping bleeds it away. (Tightened from 1
@@ -54,16 +54,16 @@ trail intensity, and the score math are all one variable.
 
 ## Constant changes
 
-| Constant | Now | New |
-| --- | --- | --- |
-| `PERFECT_POINTS` | 3 | 2 |
-| `GRAZE_POINTS` | 2 | 1 |
-| `QUICK_POINTS` (new) | — | 1 |
-| `SKIP_POINTS` | 2 | deleted |
-| `COMBO_MULTIPLIER_CAP` | 5 | `HEAT_MAX = 4` (multiplier ×5) |
-| `COMBO_WINDOW_REVOLUTIONS` | 0.75 | renamed `QUICK_WINDOW_REVOLUTIONS` |
-| `HEAT_COOL_REVOLUTIONS` (new) | — | 1 |
-| heat colors / pulse timing (new) | — | cyan → `#FFB86B` → `#FF5C3A`, pop ~0.3s |
+| Constant                         | Now  | New                                     |
+| -------------------------------- | ---- | --------------------------------------- |
+| `PERFECT_POINTS`                 | 3    | 2                                       |
+| `GRAZE_POINTS`                   | 2    | 1                                       |
+| `QUICK_POINTS` (new)             | —    | 1                                       |
+| `SKIP_POINTS`                    | 2    | deleted                                 |
+| `COMBO_MULTIPLIER_CAP`           | 5    | `HEAT_MAX = 4` (multiplier ×5)          |
+| `COMBO_WINDOW_REVOLUTIONS`       | 0.75 | renamed `QUICK_WINDOW_REVOLUTIONS`      |
+| `HEAT_COOL_REVOLUTIONS` (new)    | —    | 1                                       |
+| heat colors / pulse timing (new) | —    | cyan → `#FFB86B` → `#FF5C3A`, pop ~0.3s |
 
 ## Implementation steps
 

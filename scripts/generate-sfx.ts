@@ -139,10 +139,7 @@ function partialStack(
   opts: Omit<OscOpts, 'duration' | 'freq'> = {},
 ): Float32Array {
   const tracks = partials.map((p) =>
-    expDecay(
-      gain(osc({ ...opts, duration, freq: baseFreq * p.ratio }), p.gain),
-      p.decay,
-    ),
+    expDecay(gain(osc({ ...opts, duration, freq: baseFreq * p.ratio }), p.gain), p.decay),
   );
   return mix(...tracks);
 }
@@ -277,11 +274,17 @@ function biquad(
 ): Float32Array {
   const c = biquadCoeffs(type, f0, q, sampleRate);
   const out = new Float32Array(track.length);
-  let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+  let x1 = 0,
+    x2 = 0,
+    y1 = 0,
+    y2 = 0;
   for (let i = 0; i < track.length; i++) {
     const x = track[i];
     const y = c.b0 * x + c.b1 * x1 + c.b2 * x2 - c.a1 * y1 - c.a2 * y2;
-    x2 = x1; x1 = x; y2 = y1; y1 = y;
+    x2 = x1;
+    x1 = x;
+    y2 = y1;
+    y1 = y;
     out[i] = y;
   }
   return out;
@@ -296,13 +299,24 @@ function sweptBandpass(
   sampleRate = SR,
 ): Float32Array {
   const out = new Float32Array(track.length);
-  let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+  let x1 = 0,
+    x2 = 0,
+    y1 = 0,
+    y2 = 0;
   for (let i = 0; i < track.length; i++) {
     // Recomputing coefficients per sample is fine offline.
-    const c = biquadCoeffs('bandpass', f0From + ((f0To - f0From) * i) / track.length, q, sampleRate);
+    const c = biquadCoeffs(
+      'bandpass',
+      f0From + ((f0To - f0From) * i) / track.length,
+      q,
+      sampleRate,
+    );
     const x = track[i];
     const y = c.b0 * x + c.b1 * x1 + c.b2 * x2 - c.a1 * y1 - c.a2 * y2;
-    x2 = x1; x1 = x; y2 = y1; y1 = y;
+    x2 = x1;
+    x1 = x;
+    y2 = y1;
+    y1 = y;
     out[i] = y;
   }
   return out;
@@ -424,11 +438,19 @@ function captureRecipe(variant: number): Float32Array {
         1,
       ),
       // Upper partials with faster decay — pluck brightness that dies into warmth.
-      gain(partialStack(0.4, 440, [
-        { ratio: 2, gain: 0.4, decay: 22 },
-        { ratio: 3, gain: 0.2, decay: 30 },
-        { ratio: 4, gain: 0.09, decay: 40 },
-      ], { phase }), 1),
+      gain(
+        partialStack(
+          0.4,
+          440,
+          [
+            { ratio: 2, gain: 0.4, decay: 22 },
+            { ratio: 3, gain: 0.2, decay: 30 },
+            { ratio: 4, gain: 0.09, decay: 40 },
+          ],
+          { phase },
+        ),
+        1,
+      ),
     ),
     1.6,
   );
@@ -442,10 +464,15 @@ function grazeRecipe(variant: number): Float32Array {
   const rng = mulberry32(300 + variant);
   const center = [3300, 3650, 3950][variant - 1];
   const spark = expDecay(biquad(whiteNoise(0.1, rng), 'bandpass', center, 1.2), 38);
-  const ring = partialStack(0.14, 2731, [
-    { ratio: 1, gain: 0.5, decay: 42 },
-    { ratio: 1.53, gain: 0.3, decay: 55 }, // inharmonic — metal, not music
-  ], { phase: rng() });
+  const ring = partialStack(
+    0.14,
+    2731,
+    [
+      { ratio: 1, gain: 0.5, decay: 42 },
+      { ratio: 1.53, gain: 0.3, decay: 55 }, // inharmonic — metal, not music
+    ],
+    { phase: rng() },
+  );
   const shimmer = expDecay(biquad(whiteNoise(0.16, rng), 'highpass', 7000, 0.7), 26);
   return finalize(mix(gain(spark, 1), gain(ring, 0.55), gain(shimmer, 0.22)), 0.4);
 }
@@ -458,10 +485,18 @@ function perfectRecipe(): Float32Array {
     mix(
       gain(detunedPair({ duration: 0.55, freq, swoop: 1.05, swoopTime: 0.004 }, 4), 1),
       // Inharmonic bell partials (ratios from struck-bar spectra).
-      gain(partialStack(0.55, freq, [
-        { ratio: 2.76, gain: 0.35, decay: 14 },
-        { ratio: 5.4, gain: 0.12, decay: 24 },
-      ], { phase: rng() }), 1),
+      gain(
+        partialStack(
+          0.55,
+          freq,
+          [
+            { ratio: 2.76, gain: 0.35, decay: 14 },
+            { ratio: 5.4, gain: 0.12, decay: 24 },
+          ],
+          { phase: rng() },
+        ),
+        1,
+      ),
     );
   const dry = mix(
     gain(expDecay(bell(659.25), 8), 1), // E5
@@ -510,7 +545,10 @@ function zoneRecipe(): Float32Array {
     gain(detunedPair({ duration: 1.0, freq: 440, shape: 'triangle', phase: 0.54 }, 5), 0.3),
   );
   const swelled = fadeOut(
-    attackRamp(sweptLowpass(pad, (t) => 350 + 2200 * Math.min(t / 0.7, 1)), 0.3),
+    attackRamp(
+      sweptLowpass(pad, (t) => 350 + 2200 * Math.min(t / 0.7, 1)),
+      0.3,
+    ),
     0.35,
   );
   return finalize(reverb(swelled, { wet: 0.35, decay: 1.3, damp: 0.5, tail: 0.7 }), 0.42);

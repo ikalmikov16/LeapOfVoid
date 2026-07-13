@@ -151,7 +151,10 @@ function stepOrbit(state: GameState, dt: number): void {
   const omegaT = Math.min(1, (state.time - state.lastCaptureAt) / CAPTURE_OMEGA_SETTLE_S);
   if (omegaT < 1) {
     const k = omegaT * omegaT * (3 - 2 * omegaT);
-    const captureSpeed = Math.min(FLIGHT_SPEED / Math.max(state.captureRadius, 1), CAPTURE_OMEGA_MAX);
+    const captureSpeed = Math.min(
+      FLIGHT_SPEED / Math.max(state.captureRadius, 1),
+      CAPTURE_OMEGA_MAX,
+    );
     angularSpeed = captureSpeed + (baseSpeed - captureSpeed) * k;
   }
 

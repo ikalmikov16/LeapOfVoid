@@ -1,11 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import {
-  BALL_RADIUS,
-  BAND_MIN,
-  MAX_PLANETS,
-  PLANET_GAP,
-  RING_JITTER_MAX,
-} from './constants';
+import { BALL_RADIUS, BAND_MIN, MAX_PLANETS, PLANET_GAP, RING_JITTER_MAX } from './constants';
 import { captureBandWidth, earlyRingBoost } from './difficulty';
 import { createInitialState } from './engine';
 import { updatePlanetWindow } from './generation';

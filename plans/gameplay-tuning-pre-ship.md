@@ -33,7 +33,7 @@ right across the screen instead of climbing a near-vertical ladder.
 
 1. **Difficulty = width/distance ratio.** The release window is roughly
    (target band width) / (jump distance). We keep that ratio generous early
-   and tighten it late mostly by *stretching distance*, not shrinking rings.
+   and tighten it late mostly by _stretching distance_, not shrinking rings.
    Long jumps read as dramatic on video; thin rings read as unfair.
 2. **Bake the boost in.** `BAND_START` 38 → 48 (≈ today's 1.3×), and the
    early boost drops to a gentle 1.15 onramp so the first planets aren't
@@ -48,19 +48,19 @@ right across the screen instead of climbing a near-vertical ladder.
 
 ## Constant changes (`src/game/constants.ts`)
 
-| Constant | Now | New | Why |
-| --- | --- | --- | --- |
-| `BAND_START` | 38 | 48 | today's boosted ring becomes baseline |
-| `BAND_MIN` | 14 | 20 | late game stays timeable; distance carries difficulty |
-| `BAND_SHRINK_PER_PLANET` | 0.18 | 0.12 | slower shrink |
-| `EARLY_RING_BOOST` | 1.3 | 1.15 | gentle onramp over the bigger baseline |
-| `JUMP_MIN_BASE` | 150 | 190 | fits the bigger rings (see decision 3) |
-| `JUMP_MAX_BASE` | 210 | 270 | longer jumps from the start |
-| `JUMP_MIN_GROWTH` / `_CAP` | 0.7 / 40 | 1.0 / 70 | distance is now the main dial |
-| `JUMP_MAX_GROWTH` / `_CAP` | 1.5 / 90 | 2.5 / 180 | late jumps reach ~450px (~half a screen) |
-| `CONE_HALF_BASE` | 0.35 | 0.85 | ±49° instead of ±20° |
-| `CONE_HALF_GROWTH` / `_CAP` | 0.008 / 0.4 | 0.006 / 0.25 | max ≈ ±63° |
-| `SWING_CHANCE` (new) | — | 0.3 | 30% of placements aim at the far half of the screen |
+| Constant                    | Now         | New          | Why                                                   |
+| --------------------------- | ----------- | ------------ | ----------------------------------------------------- |
+| `BAND_START`                | 38          | 48           | today's boosted ring becomes baseline                 |
+| `BAND_MIN`                  | 14          | 20           | late game stays timeable; distance carries difficulty |
+| `BAND_SHRINK_PER_PLANET`    | 0.18        | 0.12         | slower shrink                                         |
+| `EARLY_RING_BOOST`          | 1.3         | 1.15         | gentle onramp over the bigger baseline                |
+| `JUMP_MIN_BASE`             | 150         | 190          | fits the bigger rings (see decision 3)                |
+| `JUMP_MAX_BASE`             | 210         | 270          | longer jumps from the start                           |
+| `JUMP_MIN_GROWTH` / `_CAP`  | 0.7 / 40    | 1.0 / 70     | distance is now the main dial                         |
+| `JUMP_MAX_GROWTH` / `_CAP`  | 1.5 / 90    | 2.5 / 180    | late jumps reach ~450px (~half a screen)              |
+| `CONE_HALF_BASE`            | 0.35        | 0.85         | ±49° instead of ±20°                                  |
+| `CONE_HALF_GROWTH` / `_CAP` | 0.008 / 0.4 | 0.006 / 0.25 | max ≈ ±63°                                            |
+| `SWING_CHANCE` (new)        | —           | 0.3          | 30% of placements aim at the far half of the screen   |
 
 ## Implementation steps
 

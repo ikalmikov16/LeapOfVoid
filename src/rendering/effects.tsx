@@ -112,7 +112,15 @@ export function PerfectPulse({ gameState }: { gameState: SharedValue<GameState> 
     return f < 0 ? 0 : 0.8 * (1 - f);
   });
   return (
-    <Circle cx={cx} cy={cy} r={r} style="stroke" strokeWidth={2.5} color="#74EE15" opacity={opacity} />
+    <Circle
+      cx={cx}
+      cy={cy}
+      r={r}
+      style="stroke"
+      strokeWidth={2.5}
+      color="#74EE15"
+      opacity={opacity}
+    />
   );
 }
 
@@ -143,7 +151,9 @@ function ShatterParticle({ i, gameState }: { i: number; gameState: SharedValue<G
     const s = gameState.value;
     const e = elapsed(s);
     if (e < 0) return 0;
-    return BALL_RADIUS * 0.55 * (1 - e / SHATTER_DURATION_S) * (0.5 + 0.5 * hash01(s.effectSeed, i + 13));
+    return (
+      BALL_RADIUS * 0.55 * (1 - e / SHATTER_DURATION_S) * (0.5 + 0.5 * hash01(s.effectSeed, i + 13))
+    );
   });
   const opacity = useDerivedValue(() => {
     const e = elapsed(gameState.value);

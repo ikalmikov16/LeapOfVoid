@@ -76,8 +76,7 @@ const bottom = hexToRgb(COLORS.bgBottom);
 for (let y = 0; y < SIZE; y++) {
   const t = y / SIZE;
   for (let x = 0; x < SIZE; x++) {
-    const n =
-      ((Math.sin(x * 12.9898 + y * 78.233) * 43758.5453) % 1 + 1) % 1 - 0.5;
+    const n = ((((Math.sin(x * 12.9898 + y * 78.233) * 43758.5453) % 1) + 1) % 1) - 0.5;
     const i = (y * SIZE + x) * 3;
     for (let c = 0; c < 3; c++) {
       buf[i + c] = top[c] + (bottom[c] - top[c]) * t + n * 1.5;

@@ -305,9 +305,27 @@ describe('scoring', () => {
   test('flybys tick heat mid-flight and the capture cashes in the multiplier', () => {
     // Vertical flight up x=200 past two planets 100px to either side (outside
     // their rings), into a capture on the third (40px off-path = in-band).
-    const passedA: Planet = { id: 1, center: { x: 100, y: 600 }, radius: 20, ringRadius: 50, color: '#fff' };
-    const passedB: Planet = { id: 2, center: { x: 300, y: 400 }, radius: 20, ringRadius: 50, color: '#fff' };
-    const target: Planet = { id: 3, center: { x: 240, y: 100 }, radius: 20, ringRadius: 50, color: '#fff' };
+    const passedA: Planet = {
+      id: 1,
+      center: { x: 100, y: 600 },
+      radius: 20,
+      ringRadius: 50,
+      color: '#fff',
+    };
+    const passedB: Planet = {
+      id: 2,
+      center: { x: 300, y: 400 },
+      radius: 20,
+      ringRadius: 50,
+      color: '#fff',
+    };
+    const target: Planet = {
+      id: 3,
+      center: { x: 240, y: 100 },
+      radius: 20,
+      ringRadius: 50,
+      color: '#fff',
+    };
     const s = makeState([passedA, passedB, target], {
       ballPos: { x: 200, y: 800 },
       velocity: { x: 0, y: -520 },

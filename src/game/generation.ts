@@ -173,10 +173,7 @@ export function updatePlanetWindow(state: GameState): void {
       planets = state.planets.slice();
       current = planets;
     }
-    while (
-      current[current.length - 1].center.y > generateAboveY &&
-      current.length < MAX_PLANETS
-    ) {
+    while (current[current.length - 1].center.y > generateAboveY && current.length < MAX_PLANETS) {
       current.push(generateNextPlanet(state, current));
       state.nextPlanetId += 1;
     }

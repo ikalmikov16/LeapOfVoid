@@ -40,12 +40,7 @@ export function closestApproachOnSegment(a: Vec2, b: Vec2, c: Vec2): SegmentAppr
  * Where segment a→b first enters the circle (center, radius).
  * Returns t in [0,1], 0 if it starts inside, or null if it never enters.
  */
-export function segmentCircleEntry(
-  a: Vec2,
-  b: Vec2,
-  center: Vec2,
-  radius: number,
-): number | null {
+export function segmentCircleEntry(a: Vec2, b: Vec2, center: Vec2, radius: number): number | null {
   'worklet';
   const dx = b.x - a.x;
   const dy = b.y - a.y;

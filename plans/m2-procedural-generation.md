@@ -19,7 +19,7 @@ everything after this is presentation (M3) and packaging (M4/M5).
 - Difficulty dials as pure functions of `planetsPassed`
 - Orbit decay + new "burned up" death cause
 - Fair-start rule (generous first planets, decay grace period)
-- Zone *arithmetic* (zone index = planets ÷ 20) as a difficulty stepper —
+- Zone _arithmetic_ (zone index = planets ÷ 20) as a difficulty stepper —
   zone visuals/names are M3
 - Engine unit tests for generation invariants, decay, and difficulty curves
 
@@ -42,9 +42,9 @@ everything after this is presentation (M3) and packaging (M4/M5).
   `cameraY += (target - cameraY) * min(1, CAMERA_SMOOTHING * dt)`.
 - **Camera target:** while orbiting, frame the current planet at ~65% screen
   height; while flying, track the ball so long shots stay visible.
-  *(Implementation note: the camera only ever climbs — a downward shot never
+  _(Implementation note: the camera only ever climbs — a downward shot never
   drags it back down, it just falls out of the viewport and dies. This keeps
-  the lost-in-space check meaningful and the framing monotonic.)*
+  the lost-in-space check meaningful and the framing monotonic.)_
 - **Death bounds move with the camera:** the ball is lost when it leaves the
   camera viewport by `OFFSCREEN_MARGIN` horizontally or vertically (replaces
   M1's static-screen check). Shooting downward/backward is thus fatal quickly,
@@ -72,14 +72,14 @@ everything after this is presentation (M3) and packaging (M4/M5).
 
 ### Difficulty dials (all pure functions of `planetsPassed`, in one module)
 
-| Dial | Start | Trend (starting values, tune on device) |
-|---|---|---|
-| Capture band width (main dial) | ~34px | shrink ~0.3px/planet, floor 14px |
-| Planet body radius | 20–28px random | slight growth of the random range |
-| Orbit angular speed | 2.6 rad/s | +0.02/planet, cap 4.0 |
-| Jump distance range | 150–210px | stretch toward 190–300px |
-| Placement cone width | narrow | widens (forces sideways detours) |
-| Orbit decay rate | 0 until planet 3 | then ~6 px/s, +slow growth, cap ~14 |
+| Dial                           | Start            | Trend (starting values, tune on device) |
+| ------------------------------ | ---------------- | --------------------------------------- |
+| Capture band width (main dial) | ~34px            | shrink ~0.3px/planet, floor 14px        |
+| Planet body radius             | 20–28px random   | slight growth of the random range       |
+| Orbit angular speed            | 2.6 rad/s        | +0.02/planet, cap 4.0                   |
+| Jump distance range            | 150–210px        | stretch toward 190–300px                |
+| Placement cone width           | narrow           | widens (forces sideways detours)        |
+| Orbit decay rate               | 0 until planet 3 | then ~6 px/s, +slow growth, cap ~14     |
 
 - Dials step up at **zone boundaries (every 20 planets)** in addition to the
   smooth per-planet trend, so zones feel meaningfully different (readies M3).
@@ -94,7 +94,7 @@ everything after this is presentation (M3) and packaging (M4/M5).
   cause `'burned'` ("BURNED UP IN ORBIT" on the death overlay).
 - Release velocity magnitude stays `FLIGHT_SPEED` regardless of radius;
   release direction uses the tangent at the decayed radius. Capture geometry
-  of *other* planets is untouched (band stays `[radius, ringRadius]`).
+  of _other_ planets is untouched (band stays `[radius, ringRadius]`).
 - Rendering: the current planet shows the live decaying orbit circle
   (derived value); all planets keep their faint static capture ring.
 

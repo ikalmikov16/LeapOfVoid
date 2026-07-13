@@ -74,7 +74,7 @@ M5 is packaging (icon, branding, EAS build, store listing).
 
 - Adds under the score: "BEST {n}", or a bright "NEW BEST" flash when the
   run just beat it (the clip moment — new-best runs are the ones players
-  post). New best is computed against the *pre-run* best.
+  post). New best is computed against the _pre-run_ best.
 - Share button: `Share.share({ message })` with score + a hashtag — e.g.
   "I scored 87 in Leap of Void 🕳️ #leapofvoid". Button, not tap-anywhere
   (mis-shares would be worse than mis-restarts).

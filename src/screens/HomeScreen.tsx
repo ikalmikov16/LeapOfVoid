@@ -78,12 +78,8 @@ export function HomeScreen() {
   }, []);
   const vignetteX = width / 2;
   const vignetteY = height * 0.76;
-  const vBallX = useDerivedValue(
-    () => vignetteX + Math.cos(orbitAngle.value) * VIGNETTE_ORBIT_R,
-  );
-  const vBallY = useDerivedValue(
-    () => vignetteY + Math.sin(orbitAngle.value) * VIGNETTE_ORBIT_R,
-  );
+  const vBallX = useDerivedValue(() => vignetteX + Math.cos(orbitAngle.value) * VIGNETTE_ORBIT_R);
+  const vBallY = useDerivedValue(() => vignetteY + Math.sin(orbitAngle.value) * VIGNETTE_ORBIT_R);
 
   const hintStyle = useAnimatedStyle(() => ({
     opacity: 0.3 + 0.3 * hintPulse.value,
@@ -126,9 +122,31 @@ export function HomeScreen() {
               }}
             />
           </Rect>
-          <Points points={stars.dim} mode="points" color={COLORS.starDim} style="stroke" strokeWidth={1.6} strokeCap="round" opacity={0.5} />
-          <Points points={stars.bright} mode="points" color={COLORS.starBright} style="stroke" strokeWidth={2.4} strokeCap="round" opacity={0.8} />
-          <Circle cx={vignetteX} cy={vignetteY} r={VIGNETTE_PLANET_R * 1.3} color="#9B5DE5" opacity={0.3}>
+          <Points
+            points={stars.dim}
+            mode="points"
+            color={COLORS.starDim}
+            style="stroke"
+            strokeWidth={1.6}
+            strokeCap="round"
+            opacity={0.5}
+          />
+          <Points
+            points={stars.bright}
+            mode="points"
+            color={COLORS.starBright}
+            style="stroke"
+            strokeWidth={2.4}
+            strokeCap="round"
+            opacity={0.8}
+          />
+          <Circle
+            cx={vignetteX}
+            cy={vignetteY}
+            r={VIGNETTE_PLANET_R * 1.3}
+            color="#9B5DE5"
+            opacity={0.3}
+          >
             <BlurMask blur={12} style="normal" />
           </Circle>
           <Circle
@@ -141,7 +159,13 @@ export function HomeScreen() {
             opacity={0.3}
           />
           <Circle cx={vignetteX} cy={vignetteY} r={VIGNETTE_PLANET_R} color="#9B5DE5" />
-          <Circle cx={vBallX} cy={vBallY} r={VIGNETTE_BALL_R * 2.2} color={COLORS.ballGlow} opacity={0.35}>
+          <Circle
+            cx={vBallX}
+            cy={vBallY}
+            r={VIGNETTE_BALL_R * 2.2}
+            color={COLORS.ballGlow}
+            opacity={0.35}
+          >
             <BlurMask blur={7} style="normal" />
           </Circle>
           <Circle cx={vBallX} cy={vBallY} r={VIGNETTE_BALL_R} color={COLORS.ball} />
@@ -166,7 +190,11 @@ export function HomeScreen() {
           <View style={styles.settingsCard} pointerEvents="box-none">
             <Text style={styles.settingsTitle}>SETTINGS</Text>
             <SettingsPills />
-            <Pressable style={styles.closeButton} onPress={() => setSettingsOpen(false)} hitSlop={14}>
+            <Pressable
+              style={styles.closeButton}
+              onPress={() => setSettingsOpen(false)}
+              hitSlop={14}
+            >
               <Text style={styles.closeText}>CLOSE</Text>
             </Pressable>
           </View>

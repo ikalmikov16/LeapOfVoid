@@ -47,7 +47,7 @@ zoom that sells traveling through space. No new dependencies.
   close. The `Screen` type stays `'home' | 'game'`.
 - **Home vignette = the game's first tutorial.** A small planet with a ball
   orbiting it (Skia, one `withRepeat` clock driving the angle) sits below
-  the title. It's decorative, but it *is* the mechanic — a first-time player
+  the title. It's decorative, but it _is_ the mechanic — a first-time player
   has seen an orbit before their first run. Ball uses the cold heat color.
 - **Warp transition is two one-sided animations.** Home and game share no
   scene graph, so continuity is faked with motion direction: home scales

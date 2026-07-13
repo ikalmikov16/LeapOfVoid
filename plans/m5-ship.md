@@ -31,7 +31,7 @@ gameplay, privacy labels, policy/support URLs) submitted for review.
 
 - Ads, skins, leaderboards, black hole — v2 parking lot unchanged.
 - Android build/store assets (post-launch; template Android icons stay for now).
-- App preview *video* on the listing (optional; can be added post-launch from
+- App preview _video_ on the listing (optional; can be added post-launch from
   the same clips pipeline).
 - Burn bed rework — stays parked/disabled (`BURN_ENABLED = false`).
 
@@ -58,22 +58,22 @@ gameplay, privacy labels, policy/support URLs) submitted for review.
 ## 4. Implementation steps
 
 1. **Housekeeping** — commit outstanding SFX-upgrade / UI-polish /
-   pause-and-progress work so the ship config is a clean change. *(agent)*
+   pause-and-progress work so the ship config is a clean change. _(agent)_
 2. **Branding assets** — generate icon, flatten alpha, wire into `app.json`;
    splash via `expo-splash-screen` plugin with `#060614`. Touches:
-   `assets/icon.png`, `app.json`, `package.json`. *(agent)*
+   `assets/icon.png`, `app.json`, `package.json`. _(agent)_
 3. **Ship config** — bundle ID, `buildNumber: "1"`, export-compliance key;
-   create `eas.json`. Touches: `app.json`, `eas.json`. *(agent)*
+   create `eas.json`. Touches: `app.json`, `eas.json`. _(agent)_
 4. **Privacy/support pages** — `docs/index.html` (support) +
-   `docs/privacy.html`; user enables GitHub Pages for `/docs`. *(agent + user)*
+   `docs/privacy.html`; user enables GitHub Pages for `/docs`. _(agent + user)_
 5. **EAS + Apple** — `eas login`, `eas init`, `eas build -p ios`,
    `eas submit -p ios` (auto-creates the App Store Connect record).
-   *(user in terminal, agent guiding)*
+   _(user in terminal, agent guiding)_
 6. **TestFlight verification** — install production build; run the
    accumulated on-device checklists (persistence, share, toggles, SFX mix,
-   silent-switch/mixing, performance without dev mode). *(user)*
+   silent-switch/mixing, performance without dev mode). _(user)_
 7. **Listing + submission** — screenshots from real gameplay, metadata,
-   privacy labels, age rating, submit for review. *(user, agent drafts copy)*
+   privacy labels, age rating, submit for review. _(user, agent drafts copy)_
 
 ## 5. Testing & acceptance criteria
 

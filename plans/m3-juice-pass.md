@@ -17,7 +17,7 @@ comet trail that intensifies with your combo, particle bursts on capture and
 death, screen shake and impact flash on death, squash/stretch on release,
 haptics and pitched synth SFX on every event, combo/graze/perfect bonus
 scoring, and zone transitions (background hue shift + zone name flash) every
-20 planets. Mechanics are untouched — M3 changes how the game *feels*, not how
+20 planets. Mechanics are untouched — M3 changes how the game _feels_, not how
 it plays.
 
 ## 2. Scope
@@ -78,7 +78,7 @@ Until now `score == planetsPassed`. Bonuses break that, so they split:
 ### Graze and perfect (crash deaths restored)
 
 With crash deaths back, the design doc's original graze intent works again —
-rewarding *risky proximity to the surface*:
+rewarding _risky proximity to the surface_:
 
 - **Graze** = captured with closest approach within `GRAZE_MARGIN` (~8px) of
   the planet surface — a few pixels from a crash. Sparks + bonus.
@@ -99,11 +99,11 @@ effects piggyback on it:
 - **Every visual effect is a pure function of `(state, now)`** rendered via
   Skia derived values — no particle arrays are simulated. A burst renders N
   particles whose positions are computed from `(origin, elapsed, particle
-  index)` with a per-burst seed: deterministic, allocation-free, and worklet-
+index)` with a per-burst seed: deterministic, allocation-free, and worklet-
   friendly. Shake is a decaying sinusoid of `time - deathTime` applied to the
   existing world-translate group. Flash is an opacity curve on a full-screen
   rect. Squash/stretch is a scale matrix from `time - lastReleaseAt`.
-- **Trail** needs no buffer at all: recent path history is *analytic* — a
+- **Trail** needs no buffer at all: recent path history is _analytic_ — a
   straight line back along the velocity while flying, an arc back along the
   orbit while orbiting. Each trail dot derives its position from the current
   state directly (also sidesteps mutating shared-value internals, which the
