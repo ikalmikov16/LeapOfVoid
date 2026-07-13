@@ -8,22 +8,42 @@
     "userInterfaceStyle": "dark",
     "backgroundColor": "#060614",
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.ikalmikov.leapofvoid",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#060614",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-audio"
-    ]
+      "expo-audio",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#060614"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "d1bd7bbe-50d6-4917-b357-4398b4a5a467"
+      }
+    },
+    "owner": "ikalmikov16"
   }
 }
