@@ -51,6 +51,9 @@ gameplay, privacy labels, policy/support URLs) submitted for review.
   rejects icons with alpha channels).
 - **Credentials managed by EAS** — no manual certificates/profiles in the
   Apple portal; `eas build` generates and stores them.
+- **EAS iOS image = Xcode 26** (`macos-sequoia-15.6-xcode-26.2`). Apple
+  requires the iOS 26 SDK for App Store Connect uploads (ITMS-90725). Do not
+  pin Xcode 16.x images.
 - **Privacy posture: "Data Not Collected".** No accounts, no analytics, no
   ads, no tracking; only local AsyncStorage (best score, settings). Apple
   still requires privacy-policy and support URLs → GitHub Pages on the public
