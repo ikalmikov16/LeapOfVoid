@@ -42,3 +42,12 @@ yarn-error.*
 
 # local debug exports
 .expo-export-check/
+
+# recorded gameplay clips (bun run clip)
+/clips/
+
+# Claude Code agent worktrees
+.claude/worktrees/
+
+# raw simulator captures behind the App Store screenshots (finals are in app-store-ready/)
+/assets/app-store-pics/Simulator Screenshot *.png

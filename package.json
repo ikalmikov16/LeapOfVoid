@@ -37,7 +37,10 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "sfx": "bun scripts/generate-sfx.ts",
-    "icon": "bun scripts/generate-icon.ts"
+    "icon": "bun scripts/generate-icon.ts",
+    "clip": "bun scripts/clips/record.ts",
+    "clip:take": "bun scripts/clips/make-take.ts",
+    "clip:audio": "bun scripts/clips/audio.ts"
   },
   "private": true
 }

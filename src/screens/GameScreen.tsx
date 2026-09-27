@@ -22,6 +22,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import { setBurnHeat } from '../audio/burn';
 import { sfxCapture, sfxDeath, sfxFlyby, sfxRelease, sfxZone } from '../audio/sfx';
+import { CLIP_MODE } from '../clip/clipMode';
+import { SYNC_STRIP_PT, ZONE_BANNER_S } from '../clip/replay';
+import { useClipReplay } from '../clip/useClipReplay';
 import {
   hapticCapture,
   hapticDeath,
@@ -31,11 +34,14 @@ import {
 } from '../effects/haptics';
 import {
   DEATH_OVERLAY_DELAY_MS,
+  DEATH_OVERLAY_FADE_MS,
   HEAT_COLORS,
   MAX_FRAME_DT_S,
   PAUSE_HOTSPOT_PX,
   WARP_IN_MS,
   WARP_IN_SCALE,
+  ZONE_FLASH_FADE_IN_MS,
+  ZONE_FLASH_FADE_OUT_MS,
   ZONE_FLASH_MS,
 } from '../game/constants';
 import { createInitialState, handleTap, stepGame } from '../game/engine';
@@ -52,8 +58,11 @@ const DEATH_MESSAGES: Record<DeathCause, string> = {
 };
 
 export function GameScreen() {
-  const { width, height } = useWindowDimensions();
-  const initialState = useMemo(() => createInitialState(width, height), [width, height]);
+  const window = useWindowDimensions();
+  const initialState = useMemo(
+    () => createInitialState(window.width, window.height),
+    [window.width, window.height],
+  );
   const gameState = useSharedValue<GameState>(initialState);
 
   // Pause lives outside GameState: the frame loop just stops stepping, so
@@ -74,6 +83,14 @@ export function GameScreen() {
   const [planets, setPlanets] = useState<Planet[]>(initialState.planets);
 
   const bestScore = useAppStore((s) => s.bestScore);
+
+  // Clip mode (recorder only — see src/clip): replays bot takes inside a 9:16
+  // viewport instead of reading touches. Inert in normal play.
+  const clip = useClipReplay(gameState, window.width, window.height, () => {
+    if (zoneTimer.current !== null) clearTimeout(zoneTimer.current);
+    setZoneFlash(null);
+  });
+  const { width, height } = CLIP_MODE ? clip.viewport : window;
 
   // Warp arrival: the screen mounts mid-motion (scale-in + fade) so the
   // home screen's zoom-out reads as one continuous flight.
@@ -96,6 +113,10 @@ export function GameScreen() {
 
   useFrameCallback((frame) => {
     if (paused.value) return;
+    if (CLIP_MODE) {
+      clip.onFrame();
+      return;
+    }
     const dt = Math.min((frame.timeSincePreviousFrame ?? 16.7) / 1000, MAX_FRAME_DT_S);
     // Copy-then-mutate: the engine only replaces top-level fields, and
     // reassigning .value is what notifies Skia's derived values.
@@ -118,7 +139,8 @@ export function GameScreen() {
   // stale React state.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (appState) => {
-      if (appState === 'active') return;
+      // Clip mode has nobody to press Resume — the replay must never pause.
+      if (CLIP_MODE || appState === 'active') return;
       const phase = gameState.value.phase;
       if (phase === 'orbiting' || phase === 'flying') pauseGame();
     });
@@ -143,7 +165,15 @@ export function GameScreen() {
     hapticDeath();
     setBurnHeat(0); // the flame dies with the ball, whatever heat says
     setUiPlanets(planetsPassed);
-    setIsNewBest(useAppStore.getState().submitScore(score));
+    const store = useAppStore.getState();
+    if (CLIP_MODE) {
+      // Clip takes carry their own "best" and must never touch the saved one;
+      // a new best still raises BEST for the clip's later tries.
+      setIsNewBest(score > store.bestScore);
+      clip.recordScore(score);
+    } else {
+      setIsNewBest(store.submitScore(score));
+    }
   };
   const onHeat = (heat: number) => {
     setUiHeat(heat);
@@ -154,14 +184,16 @@ export function GameScreen() {
     hapticZone();
     setZoneFlash(zonePalette(zoneIndex).name);
     if (zoneTimer.current !== null) clearTimeout(zoneTimer.current);
-    zoneTimer.current = setTimeout(() => setZoneFlash(null), ZONE_FLASH_MS);
+    // Clip mode fades the banner on sim time instead (clip.zoneBannerStyle);
+    // a wall-clock expiry would re-render mid-replay.
+    if (!CLIP_MODE) zoneTimer.current = setTimeout(() => setZoneFlash(null), ZONE_FLASH_MS);
   };
 
   // Playable tap only — overlays live outside this detector so pause/death
   // UI can never race the release gesture (Resume used to re-enable the
   // gesture mid-press and fire a release on the same touch).
   const tap = Gesture.Tap()
-    .enabled(uiPhase !== 'dead' && !uiPaused)
+    .enabled(uiPhase !== 'dead' && !uiPaused && !CLIP_MODE)
     .onBegin((e) => {
       // Shared-value guard: React `.enabled` can lag one frame behind pause.
       if (paused.value) return;
@@ -244,7 +276,10 @@ export function GameScreen() {
   useAnimatedReaction(
     () => gameState.value.zoneChangedAt,
     (t, prev) => {
-      if (prev !== null && t !== prev && t >= 0) {
+      // Only changes whose banner would still be up: a clip highlight
+      // fast-forwards through older ones (live play is always fresh).
+      const fresh = gameState.value.time - t < ZONE_BANNER_S;
+      if (prev !== null && t !== prev && t >= 0 && fresh) {
         runOnJS(onZone)(gameState.value.zoneIndex);
       }
     },
@@ -259,10 +294,21 @@ export function GameScreen() {
   );
 
   return (
-    <Animated.View style={[styles.root, warpStyle]}>
+    <Animated.View
+      style={[styles.root, warpStyle, CLIP_MODE && [styles.clipRoot, { width, height }]]}
+      // Clip mode replays a script: nothing on screen may take a touch
+      // (a stray click on the death card would start an unscripted run).
+      pointerEvents={CLIP_MODE ? 'none' : 'auto'}
+    >
       <GestureDetector gesture={tap}>
         <View style={styles.playSurface}>
-          <GameCanvas width={width} height={height} planets={planets} gameState={gameState} />
+          <GameCanvas
+            width={width}
+            height={height}
+            planets={planets}
+            gameState={gameState}
+            clipLayer={CLIP_MODE ? { height: SYNC_STRIP_PT, node: clip.canvasLayer } : undefined}
+          />
         </View>
       </GestureDetector>
       <View style={styles.hud} pointerEvents="none">
@@ -273,9 +319,9 @@ export function GameScreen() {
       </View>
       {zoneFlash !== null && (
         <Animated.View
-          entering={FadeIn.duration(250)}
-          exiting={FadeOut.duration(450)}
-          style={styles.zoneFlashWrap}
+          entering={CLIP_MODE ? undefined : FadeIn.duration(ZONE_FLASH_FADE_IN_MS)}
+          exiting={CLIP_MODE ? undefined : FadeOut.duration(ZONE_FLASH_FADE_OUT_MS)}
+          style={[styles.zoneFlashWrap, clip.zoneBannerStyle]}
           pointerEvents="none"
         >
           <Text style={styles.zoneName}>{zoneFlash}</Text>
@@ -311,9 +357,13 @@ export function GameScreen() {
       )}
       {uiPhase === 'dead' && (
         <Animated.View
-          entering={FadeIn.delay(DEATH_OVERLAY_DELAY_MS).duration(300)}
-          exiting={FadeOut.duration(120)}
-          style={styles.deathOverlay}
+          entering={
+            CLIP_MODE
+              ? undefined
+              : FadeIn.delay(DEATH_OVERLAY_DELAY_MS).duration(DEATH_OVERLAY_FADE_MS)
+          }
+          exiting={CLIP_MODE ? undefined : FadeOut.duration(120)}
+          style={[styles.deathOverlay, clip.deathCardStyle]}
         >
           <Pressable style={styles.deathTapArea} onPress={restartRun}>
             <Text style={styles.deathCause}>
@@ -358,6 +408,14 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: '#050510',
+  },
+  // Clip mode: the 9:16 viewport sits at the bottom of the device window, on
+  // top of the sync strip (which the canvas draws just below the viewport).
+  clipRoot: {
+    flex: 0,
+    position: 'absolute',
+    left: 0,
+    bottom: SYNC_STRIP_PT,
   },
   playSurface: {
     ...StyleSheet.absoluteFillObject,

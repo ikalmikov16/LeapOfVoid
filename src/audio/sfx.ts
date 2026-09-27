@@ -7,22 +7,20 @@
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 import type { CaptureKind } from '../game/types';
 import { useAppStore } from '../state/appStore';
+import {
+  CAPTURE_HEAT_STEPS,
+  flybyRate,
+  flybyVolume,
+  heatRate,
+  jitterRate as jitterRateFor,
+} from './sfxParams';
 
-/**
- * Heat → pitch as minor-pentatonic steps (semitones above the base sample).
- * Chains play a melody; the old linear 2-semitones-per-level walked a
- * whole-tone scale that never resolved.
- */
-const HEAT_SEMITONES = [0, 3, 5, 7, 10, 12, 15, 17, 19];
+// The rules (rates, volumes) live in sfxParams.ts, shared with the clip mixer
+// (scripts/clips/audio.ts) — change them there, and keep the variant lists
+// below in step with that mixer's.
 
-function heatRate(heat: number, maxIndex: number): number {
-  const idx = Math.max(0, Math.min(heat, maxIndex, HEAT_SEMITONES.length - 1));
-  return Math.pow(2, HEAT_SEMITONES[idx] / 12);
-}
-
-/** ±4% random rate — anti-fatigue for sounds whose pitch carries no meaning. */
 function jitterRate(): number {
-  return 1 + (Math.random() * 2 - 1) * 0.04;
+  return jitterRateFor(Math.random());
 }
 
 class VoicePool {
@@ -93,7 +91,7 @@ export function sfxRelease(): void {
 
 /** Capture pluck climbs a pentatonic scale with heat. */
 export function sfxCapture(kind: CaptureKind, heat: number): void {
-  capturePool.trigger(heatRate(heat, 8));
+  capturePool.trigger(heatRate(heat, CAPTURE_HEAT_STEPS));
   if (kind === 1) grazePool.trigger(jitterRate());
   else if (kind === 2) perfectPool.trigger();
 }
@@ -103,8 +101,7 @@ export function sfxCapture(kind: CaptureKind, heat: number): void {
  * each successive skip in a chain burns louder and slightly fiercer.
  */
 export function sfxFlyby(heat: number): void {
-  const h = Math.min(heat, 4);
-  flybyPool.trigger((1 + 0.05 * h) * jitterRate(), 0.55 + 0.1125 * h);
+  flybyPool.trigger(flybyRate(heat, jitterRate()), flybyVolume(heat));
 }
 
 export function sfxDeath(): void {

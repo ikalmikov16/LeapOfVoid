@@ -15,6 +15,12 @@ This repo uses **bun** (lockfile: `bun.lock`) — never npm/yarn/pnpm.
 - `bun run ios` — dev server + open iOS simulator
 - `bun run typecheck` — `tsc --noEmit` (run after every change)
 - `bun test` — game-logic unit tests (pure `src/game/` code runs under bun directly)
+- `bun run clip --skill bad|decent|pro [--count N]` — bot-played gameplay clips recorded
+  from the simulator → `clips/gameplay/*.mp4` with the game's audio (`--silent` for none;
+  needs ffmpeg ≥ 5.1; `--help` for flags). bad = fail montage, decent = a few tries, pro =
+  mid-run highlight. `bun run clip:audio <clip.json>` re-mixes audio; `bun run clip:take
+--stats 150` shows how each profile plays. See `plans/gameplay-recorder.md` and
+  `plans/clip-styles.md`.
 
 ## Stack
 
@@ -39,6 +45,9 @@ src/
   audio/      SFX playback (expo-audio players)
   effects/    haptics
   state/      zustand stores (screen, settings, best score) — never per-frame data
+  clip/       recorder-only clip mode (replays bot takes); inert (no-op hook) unless
+              EXPO_PUBLIC_CLIP_MODE=1 — never ships enabled
+scripts/clips/  the gameplay bot + simulator recorder (`bun run clip`)
 assets/sfx/   generated WAVs — regenerate with `bun run sfx` (scripts/generate-sfx.ts)
 plans/        per-milestone implementation plans (write BEFORE implementing;
               see the planning rule)

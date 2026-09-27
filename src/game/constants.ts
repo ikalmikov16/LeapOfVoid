@@ -183,8 +183,11 @@ export const FLYBY_PULSE_S = 0.3;
 export const ZONE_FADE_S = 1.5;
 /** How long the zone name flashes in the HUD (JS side). */
 export const ZONE_FLASH_MS = 3000;
+export const ZONE_FLASH_FADE_IN_MS = 250;
+export const ZONE_FLASH_FADE_OUT_MS = 450;
 /** Delay before the death overlay fades in, so the shatter reads first. */
 export const DEATH_OVERLAY_DELAY_MS = 350;
+export const DEATH_OVERLAY_FADE_MS = 300;
 
 // --- Progress markers & pause (UI) ---
 

@@ -1,12 +1,16 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { StyleSheet } from 'react-native';
+import { LogBox, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { startAmbient } from './src/audio/ambient';
 import { initAudio } from './src/audio/sfx';
+import { CLIP_MODE } from './src/clip/clipMode';
 import { GameScreen } from './src/screens/GameScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { hydrateAppStore, useAppStore } from './src/state/appStore';
+
+// Dev warning toasts must never land in a recording.
+if (CLIP_MODE) LogBox.ignoreAllLogs(true);
 
 export default function App() {
   const screen = useAppStore((s) => s.screen);
@@ -19,7 +23,7 @@ export default function App() {
   return (
     <GestureHandlerRootView style={styles.root}>
       <StatusBar hidden />
-      {screen === 'game' ? <GameScreen /> : <HomeScreen />}
+      {screen === 'game' || CLIP_MODE ? <GameScreen /> : <HomeScreen />}
     </GestureHandlerRootView>
   );
 }

@@ -6,9 +6,7 @@
 
 import { createAudioPlayer } from 'expo-audio';
 import { useAppStore } from '../state/appStore';
-
-/** The pad sits far under the SFX — felt more than heard. */
-const AMBIENT_VOLUME = 0.3;
+import { AMBIENT_VOLUME } from './sfxParams';
 
 const player = createAudioPlayer(require('../../assets/sfx/ambient.wav'));
 player.loop = true;

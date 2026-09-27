@@ -13,7 +13,7 @@ import {
   vec,
   type SkPoint,
 } from '@shopify/react-native-skia';
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { Platform } from 'react-native';
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated';
 import {
@@ -46,6 +46,10 @@ interface GameCanvasProps {
   /** React-side mirror of the planet window; updates on generation/prune. */
   planets: Planet[];
   gameState: SharedValue<GameState>;
+  /** Clip mode only: extra canvas height below the playfield plus a layer
+   * drawn last, on top of everything (the recorder's sync strip — see
+   * SYNC_STRIP_PT in src/clip/replay.ts — which nothing may paint over). */
+  clipLayer?: { height: number; node: ReactNode };
 }
 
 function mulberry32(seed: number): () => number {
@@ -126,7 +130,7 @@ function PlanetView({ planet, gameState }: { planet: Planet; gameState: SharedVa
   );
 }
 
-export function GameCanvas({ width, height, planets, gameState }: GameCanvasProps) {
+export function GameCanvas({ width, height, planets, gameState, clipLayer }: GameCanvasProps) {
   // Screen-fixed starfield backdrop (parallax is a later flavor pass).
   const stars = useMemo(() => {
     const rand = mulberry32(1337);
@@ -256,7 +260,7 @@ export function GameCanvas({ width, height, planets, gameState }: GameCanvasProp
   });
 
   return (
-    <Canvas style={{ width, height }}>
+    <Canvas style={{ width, height: height + (clipLayer?.height ?? 0) }}>
       <Rect x={0} y={0} width={width} height={height}>
         <Shader source={BG_SHADER} uniforms={bgUniforms} />
       </Rect>
@@ -318,6 +322,7 @@ export function GameCanvas({ width, height, planets, gameState }: GameCanvasProp
         <DeathShatter gameState={gameState} />
       </Group>
       <Rect x={0} y={0} width={width} height={height} color="#FFFFFF" opacity={flashOpacity} />
+      {clipLayer?.node}
     </Canvas>
   );
 }
