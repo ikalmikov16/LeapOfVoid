@@ -324,7 +324,7 @@ replay runs slower than real time anyway.
   - capture, graze and flyby variants cycling round-robin, as the voice
     pools do;
   - captures stepping up the heat scale;
-  - flybys getting louder and faster with heat;
+  - flybys getting louder and faster (so also higher) with heat;
   - ±4 % jitter on release, graze and flyby, seeded so a re-mix is
     identical;
   - the ambient pad looping underneath at 0.3.
@@ -333,17 +333,18 @@ replay runs slower than real time anyway.
   to its end; the game's single-voice pools would cut the −55 dB tail of a
   repeated chime, which is inaudible.
 
-- **Rate means tempo, not pitch.** expo-audio on iOS defaults to
-  `shouldCorrectPitch = true` with the timeDomain algorithm, so the game's
-  `setPlaybackRate` changes speed and keeps pitch. The mix matches that with
-  ffmpeg `atempo`, with the samples padded so the larger changes (heat
-  steps) take effect.
-  - atempo can't stretch a 100–200 ms sound by a few percent. So jitter and
-    heat-1/2 flyby rates play at the sound's natural length, as the phone's
-    time-stretch effectively does, and inaudibly either way.
-  - Only the silent padding is trimmed, never the sound.
-  - This also means the game's heat "melody" isn't audible on phones (see
-    §6). If the game switches to varispeed, switch the mixer to `asetrate`.
+- **Rate means pitch and speed together (varispeed).** The game's voice
+  pools set `shouldCorrectPitch = false`, so expo-audio plays a rate change
+  as varispeed and the heat melody is heard. Its default, pitch correction,
+  would only shorten each note. The mix matches that with a resampling pitch
+  shift (`asetrate` between two `aresample`s).
+  - Every rate applies exactly, jitter included, and onsets stay
+    sample-accurate.
+  - Nothing is padded or trimmed, so the ambient pad keeps its 32 s loop,
+    rest included.
+  - Rates stay ≤ 2.0, where expo-audio clamps
+    (`src/audio/sfxParams.test.ts`). The mixer doesn't clamp, so a higher
+    rate would make the clip and the phone disagree.
 - **Timing.** Each sound starts on the frame where its event first shows. A
   cue with t < 0 (just before a highlight opens) joins mid-sound.
 - **Loudness.**
@@ -412,13 +413,13 @@ the game tests. It covers:
 - **Bot:**
   - must-survive hops without a window land safely;
   - the one-lap horizon.
+- **Sound cues.**
+- **Sound rates:** every reachable rate within expo-audio's 2.0 clamp.
+- **CLI validation.**
 
 There is no automated test for the rebuild (it needs ffmpeg and a real
 capture). It is checked end to end: frame count, and per-frame comparison
 against the capture.
-
-- **Sound cues.**
-- **CLI validation.**
 
 **End to end:**
 
@@ -428,12 +429,15 @@ against the capture.
 
 ## 6. Risks and known issues
 
-- **Shipped-game audio (not a clip issue):** the rates in
-  `src/audio/sfxParams.ts` (`HEAT_SEMITONES`) are meant as pitch steps, but
-  expo-audio keeps pitch by default. On phones those rate changes only
-  shorten the sound. The fix is `shouldCorrectPitch = false` on the
-  `VoicePool` players in `src/audio/sfx.ts`, which needs an on-device listen
-  and an app update. If it's made, switch the mixer to varispeed (§3.7).
+- **Shipped-game audio: varispeed awaits an on-device listen.** Until
+  2026-09-27, expo-audio's default pitch correction meant every capture
+  played the same note, only shorter, so the heat melody (`HEAT_SEMITONES`)
+  was never heard on phones. The voice pools (and the parked burn loop) now
+  set `shouldCorrectPitch = false`, and the mixer went from `atempo` to
+  varispeed (§3.7). Players only get this with an App Store update, so
+  listen in Expo Go first. Also listen to flyby chains: rate 1.0 → 1.2 now
+  also rises ~3 semitones. `plans/sfx-upgrade.md` ruled out flyby pitch
+  after a playtest that, on expo-audio, most likely heard it pitch-corrected.
 - **JSC vs Hermes float drift.** Mitigated by the safety margins, the
   per-attempt result check and automatic re-recording.
 - **Renderer changes that add React-mirrored state.** If GameScreen starts

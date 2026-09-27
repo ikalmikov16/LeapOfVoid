@@ -31,7 +31,14 @@ class VoicePool {
   constructor(sources: number[], voicesPerSource: number) {
     this.players = [];
     for (let v = 0; v < voicesPerSource; v++) {
-      for (const source of sources) this.players.push(createAudioPlayer(source));
+      for (const source of sources) {
+        const player = createAudioPlayer(source);
+        // Varispeed: pitch follows rate, so the heat scale plays as a melody.
+        // expo-audio's default (pitch correction, iOS and Android) would play
+        // every step as the same note, only shorter. It clamps rates to 2.0.
+        player.shouldCorrectPitch = false;
+        this.players.push(player);
+      }
     }
   }
 

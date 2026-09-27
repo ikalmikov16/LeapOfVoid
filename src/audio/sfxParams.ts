@@ -2,13 +2,15 @@
 // event. Shared by the game (sfx.ts, ambient.ts) and the clip mixer
 // (scripts/clips/audio.ts) so recorded clips sound exactly like the app.
 // No expo-audio / React Native imports: this file must load under bun.
+//
+// A rate is varispeed in both — pitch and speed move together (the voice
+// pools turn off expo-audio's pitch correction). expo-audio clamps rates to
+// 2.0, so every reachable rate must stay ≤ 2 (sfxParams.test.ts).
 
 /**
- * Heat → playback rate as minor-pentatonic steps (semitones above the base
- * sample), meant as pitch — chains playing a melody; the old linear
- * 2-semitones-per-level walked a whole-tone scale that never resolved.
- * NOTE: expo-audio keeps pitch by default (shouldCorrectPitch), so on phones
- * these rates currently change tempo only — see plans/gameplay-recorder.md §6.
+ * Heat → pitch as minor-pentatonic steps (semitones above the base sample).
+ * Chains play a melody; the old linear 2-semitones-per-level walked a
+ * whole-tone scale that never resolved.
  */
 export const HEAT_SEMITONES = [0, 3, 5, 7, 10, 12, 15, 17, 19];
 
@@ -20,7 +22,10 @@ export function heatRate(heat: number, maxIndex: number): number {
 /** The capture pluck climbs the scale up to this step. */
 export const CAPTURE_HEAT_STEPS = 8;
 
-/** ±4% random rate — anti-fatigue for sounds whose pitch carries no meaning. */
+/**
+ * ±4% random rate (≈ ±0.7 semitone) — anti-fatigue for sounds whose pitch
+ * carries no meaning.
+ */
 const JITTER = 0.04;
 
 /** `roll` is a uniform draw in [0, 1). */
@@ -29,8 +34,9 @@ export function jitterRate(roll: number): number {
 }
 
 /**
- * Flyby: a fire rush per planet skipped. Escalates by intensity, not pitch —
- * each successive skip in a chain burns louder and slightly fiercer.
+ * Flyby: a fire rush per planet skipped. Escalates by intensity, not a scale
+ * step — each successive skip in a chain burns louder and slightly faster
+ * (rate 1.0 → 1.2, which varispeed also lifts ~3 semitones).
  */
 export function flybyRate(heat: number, jitter: number): number {
   return (1 + 0.05 * Math.min(heat, 4)) * jitter;

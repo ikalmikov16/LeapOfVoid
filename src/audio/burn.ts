@@ -17,6 +17,12 @@ import { useAppStore } from '../state/appStore';
  * The plumbing stays — GameScreen drives setBurnHeat on every heat change —
  * so perfecting it later is a matter of reworking burnRecipe() in
  * scripts/generate-sfx.ts and flipping this flag.
+ *
+ * Also fix before enabling: on iOS, expo-audio restarts a loop with
+ * AVPlayer.play(), which resets the rate to 1.0. From its first restart after
+ * a heat change, each player drops back to rate 1 — an audible pitch drop
+ * under varispeed, and the pair's half-loop offset drifts — until the next
+ * setBurnHeat. Re-apply the rate on each restart, or drop BURN_RATES.
  */
 const BURN_ENABLED = false;
 
@@ -24,7 +30,7 @@ const BURN_ENABLED = false;
 const BURN_LOOP_S = 6;
 /** Volume per heat level 0..HEAT_MAX; 0 = off (white ball). */
 const BURN_VOLUMES = [0, 0.15, 0.23, 0.32, 0.42];
-/** The flame also spins slightly faster (brighter, fiercer) per level. */
+/** The flame also runs slightly faster per level — varispeed, so up to ~2 semitones brighter. */
 const BURN_RATES = [1, 1, 1.04, 1.08, 1.12];
 /** Exponential ease time constants — igniting is quicker than dying down. */
 const RAMP_UP_TAU_MS = 250;
@@ -36,6 +42,8 @@ const players = [createAudioPlayer(source), createAudioPlayer(source)];
 for (const p of players) {
   p.loop = true;
   p.volume = 0;
+  // Varispeed, like the SFX voice pools: a faster flame is also a brighter one.
+  p.shouldCorrectPitch = false;
 }
 
 let active = false;

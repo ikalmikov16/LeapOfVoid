@@ -128,18 +128,19 @@ async function ffmpeg(args: string[]): Promise<string> {
 }
 
 /**
- * Decode a sample to mono float32 at SAMPLE_RATE, optionally tempo-changed
- * (a rate is a tempo change, as on the phone — see renderMix). ffmpeg's
- * atempo can't stretch a 100–200 ms sound by a few percent: padding with
- * silence lets the larger changes (heat steps) through, and what it can't
- * stretch plays at its natural length — the phone's time-stretch has the
- * same limit, and a ±4 % difference in a 0.1 s sound is inaudible anyway.
- * Nothing audible is cut: only the silent tail is trimmed off.
+ * Decode a sample to mono float32 at SAMPLE_RATE, optionally at a playback
+ * rate the way the phone plays it: varispeed, pitch and speed together.
+ * Relabelling the sample rate (asetrate) does exactly that, and the second
+ * resample brings it back to SAMPLE_RATE. Nothing is padded or trimmed, so a
+ * loop (the ambient pad, whose loop ends in a rest) keeps its exact length.
  */
 async function decode(file: string, rate = 1): Promise<Float32Array> {
-  const tempo = Math.abs(rate - 1) > 1e-6 ? `,apad=pad_dur=1,atempo=${rate.toFixed(6)}` : '';
+  const varispeed =
+    Math.abs(rate - 1) > 1e-6
+      ? `,asetrate=${Math.round(SAMPLE_RATE * rate)},aresample=${SAMPLE_RATE}`
+      : '';
   const proc = track(Bun.spawn(
-    ['ffmpeg', '-v', 'error', '-i', file, '-af', `aresample=${SAMPLE_RATE}${tempo}`,
+    ['ffmpeg', '-v', 'error', '-i', file, '-af', `aresample=${SAMPLE_RATE}${varispeed}`,
      '-ac', '1', '-f', 'f32le', '-'],
     { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' },
   )); // prettier-ignore
@@ -149,10 +150,7 @@ async function decode(file: string, rate = 1): Promise<Float32Array> {
     proc.exited,
   ]);
   if (code !== 0) throw new Error(`ffmpeg could not decode ${file}:\n${err}`);
-  const samples = new Float32Array(buf);
-  let end = samples.length;
-  while (end > 0 && Math.abs(samples[end - 1]) < 1e-5) end -= 1; // below −100 dB
-  return samples.subarray(0, end);
+  return new Float32Array(buf);
 }
 
 /** Stereo 32-bit float WAV (both channels identical — the game's samples are mono). */
@@ -185,11 +183,10 @@ function writeWav(path: string, mono: Float32Array): Promise<number> {
  * exactly `seconds` long. A cue with t < 0 started before the clip opened
  * (a highlight's first frames) and joins mid-sound.
  *
- * expo-audio on iOS keeps pitch when the rate changes (shouldCorrectPitch
- * defaults to true, timeDomain algorithm) — so a rate here is a tempo change
- * (atempo), not a pitch shift, to sound like the phone does. The summing is
- * done here rather than in an ffmpeg amix graph: with dozens of atempo
- * branches that graph ended the mix early.
+ * A rate is varispeed (see decode), as on the phone, where the voice pools
+ * turn off expo-audio's pitch correction (src/audio/sfx.ts). The summing is
+ * done here rather than in an ffmpeg amix graph: with dozens of per-cue
+ * filter branches that graph ended the mix early.
  */
 async function renderMix(cues: SoundCue[], seconds: number, out: string): Promise<void> {
   const length = Math.round(seconds * SAMPLE_RATE);
