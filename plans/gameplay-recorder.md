@@ -45,8 +45,8 @@ Xcode with an iPhone simulator that has Expo Go installed, and ffmpeg ≥ 5.1.
 
 **Out (later plans):**
 
-- Viral hook clips, overlays/CTA and compose templates (Remotion), which are
-  the next plan.
+- Viral hook clips, overlays/CTA and compose templates (Remotion). The end
+  card is built (`plans/clip-composer.md`); the rest is still to come.
 - Android, real-device capture and auto-posting.
 - Any change to gameplay, tuning or the production app's behaviour.
 

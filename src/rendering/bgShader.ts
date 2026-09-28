@@ -21,12 +21,3 @@ half4 main(float2 xy) {
 if (!source) throw new Error('bg shader failed to compile');
 
 export const BG_SHADER = source;
-
-/** '#RRGGBB' → [r, g, b] in 0..1, the shader's uniform format. */
-export function hexToRgb01(hex: string): [number, number, number] {
-  return [
-    parseInt(hex.slice(1, 3), 16) / 255,
-    parseInt(hex.slice(3, 5), 16) / 255,
-    parseInt(hex.slice(5, 7), 16) / 255,
-  ];
-}

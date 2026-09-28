@@ -53,11 +53,16 @@ export interface SoundCue {
   volume: number;
 }
 
-/** The sidecar timeline entries this mixer reads (see frames.ts clipTimeline). */
+/**
+ * The sidecar timeline entries this mixer reads (see frames.ts clipTimeline).
+ * A composed clip's timeline (compose/endCard.ts) adds the end card's beats
+ * and its `sound` entries, which play exactly as written.
+ */
 type TimelineEntry =
-  | { t: number; type: 'release' | 'zone' | 'death' | 'attemptStart' | 'attemptEnd' }
+  | { t: number; type: 'release' | 'zone' | 'death' | 'attemptStart' | 'attemptEnd' | 'endCard' }
   | { t: number; type: 'capture'; kind: number; heat: number }
-  | { t: number; type: 'flyby'; heat: number };
+  | { t: number; type: 'flyby'; heat: number }
+  | { t: number; type: 'sound'; sample: string; rate: number; volume: number };
 
 /**
  * The game's sound for each timeline event: the samples, variant order, rates
@@ -108,6 +113,9 @@ export function soundCues(timeline: TimelineEntry[], seed: number): SoundCue[] {
         break;
       case 'death':
         cues.push({ t: e.t, sample: 'death', rate: 1, volume: 1 });
+        break;
+      case 'sound':
+        cues.push({ t: e.t, sample: e.sample, rate: e.rate, volume: e.volume });
         break;
     }
   }

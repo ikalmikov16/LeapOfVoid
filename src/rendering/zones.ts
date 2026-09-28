@@ -1,7 +1,7 @@
 // Zone flavor: background palettes + names, cycled every ZONE_SIZE planets.
 // Names are placeholders — rename freely, nothing else references them.
 
-import { hexToRgb01 } from './bgShader';
+import { hexToRgb01 } from './color';
 
 export interface ZonePalette {
   name: string;

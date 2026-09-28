@@ -23,7 +23,8 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { COLORS, WARP_OUT_MS, WARP_OUT_SCALE } from '../game/constants';
-import { BG_SHADER, hexToRgb01 } from '../rendering/bgShader';
+import { BG_SHADER } from '../rendering/bgShader';
+import { hexToRgb01 } from '../rendering/color';
 import { useAppStore } from '../state/appStore';
 import { SettingsPills } from './ui';
 

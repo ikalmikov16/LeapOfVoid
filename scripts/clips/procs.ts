@@ -1,8 +1,9 @@
-// Child-process and temp-file bookkeeping shared by the recorder and the
-// audio mixer. Bun doesn't kill children when it exits, so every child is
-// tracked and an abort (Ctrl-C, SIGTERM, SIGHUP) stops them all — recorders
-// with SIGINT so simctl finalises its file — and deletes unfinished outputs.
-// Once an abort has started, nothing new may be spawned.
+// Child-process and temp-file bookkeeping shared by the recorder, the audio
+// mixer and the composer. Bun doesn't kill children when it exits, so every
+// child is tracked and an abort (Ctrl-C, SIGTERM, SIGHUP) stops them all —
+// recorders with SIGINT so simctl finalises its file — cancels registered
+// work (onAbort) and deletes unfinished outputs. Once an abort has started,
+// nothing new may be spawned.
 
 import type { Subprocess } from 'bun';
 import { rmSync } from 'node:fs';
@@ -13,6 +14,8 @@ export const ROOT = resolve(import.meta.dir, '../..');
 const children = new Set<Subprocess>();
 const recorders = new Set<Subprocess>();
 const temps = new Set<string>();
+/** Work we don't spawn ourselves (a Remotion render) that must be cancelled on abort. */
+const abortHooks = new Set<() => void>();
 let aborting = false;
 
 /** Thrown by anything that would start new work after an abort began. */
@@ -76,8 +79,16 @@ export async function stopProcess(
   t.clear();
 }
 
+/** Run `cancel` if we abort while it's registered; returns the unregister function. */
+export function onAbort(cancel: () => void): () => void {
+  abortHooks.add(cancel);
+  return () => abortHooks.delete(cancel);
+}
+
 /** Stop every tracked child and delete unfinished outputs. */
 export async function killAll(): Promise<void> {
+  for (const cancel of abortHooks) cancel();
+  abortHooks.clear();
   for (let round = 0; round < 5 && children.size > 0; round++) {
     await Promise.all([...recorders].map((p) => stopProcess(p, 'SIGINT', 5000)));
     await Promise.all([...children].map((p) => stopProcess(p, 'SIGTERM', 3000)));

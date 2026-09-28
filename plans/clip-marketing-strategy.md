@@ -4,7 +4,9 @@
 this is the _why_ and the overall pipeline. Implementation plans hang off it:
 
 - `plans/gameplay-recorder.md` — automated gameplay capture (first build).
-- (future) clip composer — hook + gameplay + overlays → finished reel.
+- `plans/clip-composer.md` — the composer's first part: the branded end card
+  (`bun run clip:compose`, built 2026-09-27). Still to come: hook clips,
+  the persistent name tag and captions.
 
 ## 1. Goal
 
@@ -52,9 +54,12 @@ Agreed observations about this format:
 ### C. Overlay / CTA layer (applies to A and B)
 
 Text overlays on the gameplay that introduce the game and prompt the download:
-hook caption, persistent game-name tag, end card ("Leap of Void — free on the
-App Store"). Game name should be on screen the whole time — views ≠ installs,
-and the viewer has to be able to search for it.
+hook caption, persistent game-name tag, end card. Game name should be on
+screen the whole time — views ≠ installs, and the viewer has to be able to
+search for it. The end card is built (`plans/clip-composer.md`): a warp into
+the app icon's orbit, LEAP OF VOID, "YOUR TURN." and a game-styled "Download
+from the App Store" button. It uses no App Store badge, because Apple forbids
+animating or restyling it.
 
 ## 3. Pipeline
 
